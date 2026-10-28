@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #EEF2F0;
+    color: #1A2E26;
+  }
+}
+
+.tabular-nums {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #E5ECE8;
+}
+::-webkit-scrollbar-thumb {
+  background: #B4C7BD;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8FA89C;
+}
+
+/* Forest Canopy Hero Banner Texture (Matching Screenshot's Lush Dark Canopy) */
+.bg-canopy {
+  background-color: #032B1F;
+  background-image: 
+    radial-gradient(circle at 85% 15%, rgba(16, 185, 129, 0.22) 0%, transparent 45%),
+    radial-gradient(circle at 15% 85%, rgba(6, 78, 59, 0.45) 0%, transparent 55%),
+    radial-gradient(circle at 50% 40%, rgba(5, 150, 105, 0.15) 0%, transparent 60%),
+    linear-gradient(135deg, rgba(2, 40, 28, 0.95) 0%, rgba(6, 59, 41, 0.90) 50%, rgba(10, 77, 54, 0.92) 100%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.015) 0px, rgba(255, 255, 255, 0.015) 2px, transparent 2px, transparent 12px);
+  background-size: cover;
+}
+
+/* Security guilloché pattern in forest green */
+.bg-guilloche {
+  background-color: #f7faf8;
+  background-image: 
+    radial-gradient(circle at 50% 50%, transparent 20%, rgba(0, 71, 50, 0.04) 21%, transparent 22%),
+    radial-gradient(circle at 20% 20%, transparent 20%, rgba(0, 71, 50, 0.03) 21%, transparent 22%),
+    radial-gradient(circle at 80% 80%, transparent 20%, rgba(0, 71, 50, 0.03) 21%, transparent 22%),
+    linear-gradient(135deg, rgba(0, 71, 50, 0.03) 25%, transparent 25%),
+    linear-gradient(225deg, rgba(0, 71, 50, 0.03) 25%, transparent 25%),
+    linear-gradient(45deg, rgba(0, 71, 50, 0.03) 25%, transparent 25%),
+    linear-gradient(315deg, rgba(0, 71, 50, 0.03) 25%, transparent 25%);
+  background-position: 0 0, 40px 40px, 80px 80px, 16px 0, 16px 0, 0 0, 0 0;
+  background-size: 80px 80px, 80px 80px, 80px 80px, 32px 32px, 32px 32px, 32px 32px, 32px 32px;
+}

@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "BankSystemState": {
+      "title": "BankSystemState",
+      "description": "Central real-time banking state synchronized across all client devices and admin dashboards.",
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "object",
+          "description": "Active user profile information including balances and contact details."
+        },
+        "accounts": {
+          "type": "array",
+          "description": "List of client bank accounts and current balances."
+        },
+        "transactions": {
+          "type": "array",
+          "description": "Chronological ledger of cleared, pending, and reviewed transactions."
+        },
+        "cards": {
+          "type": "array",
+          "description": "Debit and credit payment cards, limits, and security status."
+        },
+        "payees": {
+          "type": "array",
+          "description": "Saved payees and bill payment recipients."
+        },
+        "goals": {
+          "type": "array",
+          "description": "Client savings goals and progress."
+        },
+        "notifications": {
+          "type": "array",
+          "description": "Real-time alerts and banking notifications."
+        },
+        "pendingChanges": {
+          "type": "array",
+          "description": "Queue of profile and card limit changes submitted for admin review."
+        },
+        "supportMessages": {
+          "type": "array",
+          "description": "Direct message thread between client and Tompkins operations desk."
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of the most recent database mutation."
+        }
+      },
+      "required": [
+        "accounts",
+        "transactions"
+      ]
+    }
+  },
+  "firestore": {
+    "/banking_system/{systemId}": {
+      "schema": {
+        "$ref": "#/entities/BankSystemState"
+      },
+      "description": "Global synchronized banking system state shared across all mobile and desktop devices."
+    }
+  }
+}

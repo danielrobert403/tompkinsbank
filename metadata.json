@@ -1,0 +1,8 @@
+{
+  "name": "Apex Bank",
+  "description": "Experience modern digital banking with Apex Bank. High-yield savings, fee-free premier checking, instant transfers, smart bill pay, and obsidian metal card controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
