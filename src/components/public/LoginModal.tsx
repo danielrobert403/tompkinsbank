@@ -10,8 +10,8 @@ interface LoginModalProps {
 
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const { login, setActivePage } = useBanking();
-  const [username, setUsername] = useState('paulina villarreal');
-  const [password, setPassword] = useState('27girlsplay');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -73,7 +73,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         )}
 
         {/* Login Form */}
-        <form onSubmit={handleSignIn} className="w-full space-y-6">
+        <form onSubmit={handleSignIn} className="w-full space-y-6" autoComplete="off">
           {/* Username Field */}
           <div>
             <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
@@ -82,13 +82,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             <div className="border-b border-slate-300 focus-within:border-[#004732] transition-colors pb-1">
               <input
                 type="text"
-                placeholder="paulina villarreal"
+                placeholder=""
                 value={username}
                 onChange={(e) => {
                   setUsername(e.target.value);
                   if (errorMessage) setErrorMessage(null);
                 }}
                 required
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck="false"
                 className="w-full text-slate-800 placeholder-slate-400 text-base py-1 focus:outline-none bg-transparent"
               />
             </div>
@@ -102,13 +105,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             <div className="border-b border-slate-300 focus-within:border-[#004732] transition-colors pb-1 flex items-center justify-between">
               <input
                 type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••••••"
+                placeholder=""
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
                   if (errorMessage) setErrorMessage(null);
                 }}
                 required
+                autoComplete="new-password"
                 className="w-full text-slate-800 placeholder-slate-400 text-base py-1 focus:outline-none bg-transparent"
               />
               <button

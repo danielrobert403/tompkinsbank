@@ -5,8 +5,8 @@ import { Eye, EyeOff, AlertCircle, ArrowLeft } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const { login, setActivePage } = useBanking();
-  const [username, setUsername] = useState('paulina villarreal');
-  const [password, setPassword] = useState('27girlsplay');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,15 +49,12 @@ export const LoginPage: React.FC = () => {
         style={{ backgroundImage: `url('/assets/aistudio/image_360d8650.png')` }}
       />
 
-      {/* Top Bar with back to site button */}
+      {/* Top Bar with security notice */}
       <div className="relative z-10 w-full max-w-5xl px-4 py-6 flex justify-between items-center">
-        <button
-          onClick={() => setActivePage('home')}
-          className="px-3 py-1.5 rounded bg-white/80 hover:bg-white text-[#004732] text-xs font-semibold backdrop-blur-xs shadow-sm flex items-center gap-1.5 transition-all"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Back to Home</span>
-        </button>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-white/80 backdrop-blur-xs text-[#004732] text-xs font-semibold shadow-xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Tompkins Community Bank · Secure Digital Banking</span>
+        </div>
       </div>
 
       {/* Centered White Card (Exact replica of image_360d8650.png) */}
@@ -77,7 +74,7 @@ export const LoginPage: React.FC = () => {
         )}
 
         {/* Login Form */}
-        <form onSubmit={handleSignIn} className="w-full space-y-6">
+        <form onSubmit={handleSignIn} className="w-full space-y-6" autoComplete="off">
           {/* Username Field */}
           <div>
             <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
@@ -86,13 +83,16 @@ export const LoginPage: React.FC = () => {
             <div className="border-b border-slate-300 focus-within:border-[#004732] transition-colors pb-1">
               <input
                 type="text"
-                placeholder="paulina villarreal"
+                placeholder=""
                 value={username}
                 onChange={(e) => {
                   setUsername(e.target.value);
                   if (errorMessage) setErrorMessage(null);
                 }}
                 required
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck="false"
                 className="w-full text-slate-800 placeholder-slate-400 text-base py-1 focus:outline-none bg-transparent"
               />
             </div>
@@ -106,13 +106,14 @@ export const LoginPage: React.FC = () => {
             <div className="border-b border-slate-300 focus-within:border-[#004732] transition-colors pb-1 flex items-center justify-between">
               <input
                 type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••••••"
+                placeholder=""
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
                   if (errorMessage) setErrorMessage(null);
                 }}
                 required
+                autoComplete="new-password"
                 className="w-full text-slate-800 placeholder-slate-400 text-base py-1 focus:outline-none bg-transparent"
               />
               <button

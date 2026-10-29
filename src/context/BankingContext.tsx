@@ -113,17 +113,17 @@ interface BankingContextType {
 const BankingContext = createContext<BankingContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  USER: 'tompkins_bank_user_profile_v4',
-  ACCOUNTS: 'tompkins_bank_accounts_v4',
-  TRANSACTIONS: 'tompkins_bank_txs_v4',
-  CARDS: 'tompkins_bank_cards_v4',
-  PAYEES: 'tompkins_bank_payees_v4',
-  GOALS: 'tompkins_bank_goals_v4',
-  NOTIFICATIONS: 'tompkins_bank_notifs_v4',
-  LOGGED_IN: 'tompkins_bank_auth_state_v4',
-  ADMIN_LOGGED_IN: 'tompkins_bank_admin_auth_v4',
-  PENDING_CHANGES: 'tompkins_bank_pending_changes_v4',
-  SUPPORT_MESSAGES: 'tompkins_bank_support_messages_v4',
+  USER: 'tompkins_bank_user_profile_v5',
+  ACCOUNTS: 'tompkins_bank_accounts_v5',
+  TRANSACTIONS: 'tompkins_bank_txs_v5',
+  CARDS: 'tompkins_bank_cards_v5',
+  PAYEES: 'tompkins_bank_payees_v5',
+  GOALS: 'tompkins_bank_goals_v5',
+  NOTIFICATIONS: 'tompkins_bank_notifs_v5',
+  LOGGED_IN: 'tompkins_bank_auth_state_v5',
+  ADMIN_LOGGED_IN: 'tompkins_bank_admin_auth_v5',
+  PENDING_CHANGES: 'tompkins_bank_pending_changes_v5',
+  SUPPORT_MESSAGES: 'tompkins_bank_support_messages_v5',
 };
 
 const DEFAULT_USER: UserProfile = {
@@ -155,12 +155,16 @@ const DEFAULT_USER: UserProfile = {
 
 export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.LOGGED_IN);
-    return saved !== null ? JSON.parse(saved) : false; // Clean public landing page when unauthenticated
+    // When site is clicked/opened, start on login page straight up unless explicitly logged in in this session
+    const sessionActive = sessionStorage.getItem('tompkins_bank_session_active');
+    return sessionActive === 'true';
   });
 
   const [activePortalTab, setActivePortalTab] = useState<string>('overview');
-  const [activePage, setActivePage] = useState<string>('home');
+  const [activePage, setActivePage] = useState<string>(() => {
+    const sessionActive = sessionStorage.getItem('tompkins_bank_session_active');
+    return sessionActive === 'true' ? 'my-account' : 'login';
+  });
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
 
   const [user, setUser] = useState<UserProfile>(() => {
@@ -183,22 +187,31 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [accounts, setAccounts] = useState<BankAccount[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.ACCOUNTS);
-    return saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
+    const raw: BankAccount[] = saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
+    return raw.map((a) => {
+      if (a.id === 'acc_chk_01' || a.type === 'checking') {
+        return { ...a, balance: 82000.00, availableBalance: 82000.00 };
+      }
+      return a;
+    });
   });
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
     const rawList: Transaction[] = saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
     const seen = new Set<string>();
-    return rawList.map((tx, idx) => {
-      let finalDate = tx.date;
-      if (finalDate > '2026-09-17') {
-        finalDate = '2026-09-17';
-      }
-      const uniqueId = seen.has(tx.id) ? `${tx.id}_uniq_${idx}` : tx.id;
-      seen.add(uniqueId);
-      return { ...tx, id: uniqueId, date: finalDate };
-    });
+    // Clear all pending transactions and ensure dates are capped at 2026-09-17
+    return rawList
+      .filter((tx) => tx.status !== 'pending')
+      .map((tx, idx) => {
+        let finalDate = tx.date;
+        if (finalDate > '2026-09-17') {
+          finalDate = '2026-09-17';
+        }
+        const uniqueId = seen.has(tx.id) ? `${tx.id}_uniq_${idx}` : tx.id;
+        seen.add(uniqueId);
+        return { ...tx, id: uniqueId, date: finalDate };
+      });
   });
 
   const [cards, setCards] = useState<PaymentCard[]>(() => {
@@ -293,13 +306,21 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           isRemoteSyncRef.current = true;
 
           if (data.accounts && Array.isArray(data.accounts)) {
-            setAccounts(data.accounts);
+            const normalizedAccounts = data.accounts.map((a: BankAccount) => {
+              if (a.id === 'acc_chk_01' || a.type === 'checking') {
+                return { ...a, balance: 82000.00, availableBalance: 82000.00 };
+              }
+              return a;
+            });
+            setAccounts(normalizedAccounts);
           }
           if (data.transactions && Array.isArray(data.transactions)) {
-            const normalizedTxs = data.transactions.map((t: Transaction) => ({
-              ...t,
-              date: t.date > '2026-09-17' ? '2026-09-17' : t.date,
-            }));
+            const normalizedTxs = data.transactions
+              .filter((t: Transaction) => t.status !== 'pending')
+              .map((t: Transaction) => ({
+                ...t,
+                date: t.date > '2026-09-17' ? '2026-09-17' : t.date,
+              }));
             setTransactions(normalizedTxs);
           }
           if (data.cards && Array.isArray(data.cards)) {
@@ -465,13 +486,13 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const logout = () => {
     setIsLoggedIn(false);
     localStorage.setItem(STORAGE_KEYS.LOGGED_IN, JSON.stringify(false));
-    setActivePage('home');
+    setActivePage('login');
   };
 
   const logoutAdmin = () => {
     setIsAdminLoggedIn(false);
     localStorage.setItem(STORAGE_KEYS.ADMIN_LOGGED_IN, JSON.stringify(false));
-    setActivePage('home');
+    setActivePage('login');
   };
 
   const submitChangeRequest = (req: Omit<PendingUserChange, 'id' | 'requestedAt' | 'status'>): string => {

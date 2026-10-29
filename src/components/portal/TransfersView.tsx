@@ -423,7 +423,7 @@ export const TransfersView: React.FC = () => {
               <Lock className="w-3.5 h-3.5 text-emerald-400" />
               <span>Security Authorization PIN</span>
             </label>
-            <span className="text-[11px] text-slate-500 font-mono">4-digit code (0502)</span>
+            <span className="text-[11px] text-slate-500 font-mono">4-digit code </span>
           </div>
           <input
             type="password"

@@ -13,6 +13,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAccountClick, onOpenLoginM
   const {
     isLoggedIn,
     setIsLoggedIn,
+    logout,
     activePage,
     setActivePage,
     user,
@@ -265,8 +266,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAccountClick, onOpenLoginM
                 <span className="hidden sm:inline">Hi, {user.name.split(' ')[0] || 'Paulina'}</span>
               </button>
               <button
-                onClick={() => setIsLoggedIn(false)}
-                className="px-3 py-1.5 bg-white hover:bg-rose-50 border border-slate-300 text-slate-600 hover:text-rose-600 rounded text-xs font-medium transition-colors flex items-center gap-1"
+                onClick={logout}
+                className="px-3 py-1.5 bg-white hover:bg-rose-50 border border-slate-300 text-slate-600 hover:text-rose-600 rounded text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
                 title="Log Out"
               >
                 <LogOut className="w-3.5 h-3.5" />

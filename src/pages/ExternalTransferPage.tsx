@@ -512,7 +512,7 @@ export const ExternalTransferPage: React.FC = () => {
                   <span className="w-6 h-6 rounded-full bg-[#004732] text-white flex items-center justify-center text-xs font-bold">5</span>
                   <span>Security Authorization PIN</span>
                 </h2>
-                <span className="text-xs text-slate-400 font-mono">4-digit code (0502)</span>
+                <span className="text-xs text-slate-400 font-mono">4-digit code </span>
               </div>
               <div className="max-w-xs">
                 <input

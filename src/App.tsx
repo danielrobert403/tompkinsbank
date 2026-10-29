@@ -17,7 +17,7 @@ import { LoginModal } from './components/public/LoginModal';
 import { StatementModal } from './components/portal/StatementModal';
 
 const MainAppLayout: React.FC = () => {
-  const { activePage, setActivePage, isAdminLoggedIn, setIsAdminLoggedIn } = useBanking();
+  const { activePage, setActivePage, isAdminLoggedIn, setIsAdminLoggedIn, isLoggedIn } = useBanking();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isStatementModalOpen, setIsStatementModalOpen] = useState(false);
 
@@ -48,7 +48,11 @@ const MainAppLayout: React.FC = () => {
     };
   }, [setActivePage, setIsAdminLoggedIn]);
 
-  // If on full-screen LoginPage, render exact replica of image_360d8650.png
+  // If not logged in and not admin, or if activePage is login, render full LoginPage straight up
+  if (!isLoggedIn && !isAdminLoggedIn) {
+    return <LoginPage />;
+  }
+
   if (activePage === 'login') {
     return <LoginPage />;
   }
