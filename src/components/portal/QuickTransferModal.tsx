@@ -11,6 +11,7 @@ import {
   Zap,
   ArrowRight,
   AlertCircle,
+  Lock,
 } from 'lucide-react';
 
 interface QuickTransferModalProps {
@@ -36,6 +37,8 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
   const [fromAccountId, setFromAccountId] = useState<string>(accounts[0]?.id || '');
   const [amount, setAmount] = useState<string>('');
   const [memo, setMemo] = useState<string>('');
+  const [securityPin, setSecurityPin] = useState<string>('');
+  const [pinError, setPinError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Internal Transfer State
@@ -142,6 +145,17 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
       return;
     }
 
+    if (!securityPin.trim()) {
+      setPinError('Please enter your 4-digit Security PIN.');
+      return;
+    }
+
+    if (securityPin.trim() !== '0502') {
+      setPinError('Invalid Security PIN. Authorization denied (PIN: 0502).');
+      return;
+    }
+
+    setPinError(null);
     setIsSubmitting(true);
 
     setTimeout(() => {
@@ -156,6 +170,7 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
         externalAccount: accountNumber.trim(),
         speed: wireRail === 'ach' ? 'standard' : 'instant',
         wireType: wireRail,
+        securityPin: securityPin.trim(),
       });
 
       setIsSubmitting(false);
@@ -193,6 +208,17 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
       return;
     }
 
+    if (!securityPin.trim()) {
+      setPinError('Please enter your 4-digit Security PIN.');
+      return;
+    }
+
+    if (securityPin.trim() !== '0502') {
+      setPinError('Invalid Security PIN. Authorization denied (PIN: 0502).');
+      return;
+    }
+
+    setPinError(null);
     setIsSubmitting(true);
 
     setTimeout(() => {
@@ -203,6 +229,7 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
         amount: numAmount,
         memo: memo.trim() || 'Internal Quick Transfer',
         speed: 'instant',
+        securityPin: securityPin.trim(),
       });
 
       setIsSubmitting(false);
@@ -229,6 +256,8 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
     setBeneficiaryName('');
     setAccountNumber('');
     setConfirmAccountNumber('');
+    setSecurityPin('');
+    setPinError(null);
     handleClearBank();
   };
 
@@ -574,6 +603,39 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
                 </div>
               </div>
 
+              {/* 6. Security Authorization PIN Verification */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-[#004732]" />
+                    <span>Security Authorization PIN</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400 font-mono">4-digit code (0502)</span>
+                </div>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  placeholder="Enter 4-digit PIN (••••)"
+                  value={securityPin}
+                  onChange={(e) => {
+                    setSecurityPin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                    if (pinError) setPinError(null);
+                  }}
+                  required
+                  className={`w-full px-3 py-2 border rounded text-sm font-mono tracking-widest text-slate-900 bg-white focus:outline-none focus:border-[#004732] ${
+                    pinError ? 'border-rose-500 bg-rose-50/50 ring-1 ring-rose-500' : 'border-slate-300'
+                  }`}
+                />
+                {pinError && (
+                  <p className="text-[11px] text-rose-600 font-medium mt-1.5 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{pinError}</span>
+                  </p>
+                )}
+              </div>
+
               {/* Submit Button */}
               <div className="flex items-center gap-3 pt-2">
                 <button
@@ -663,6 +725,39 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
                     className="w-full px-3 py-2 border border-slate-300 rounded text-xs text-slate-900 focus:outline-none focus:border-[#004732]"
                   />
                 </div>
+              </div>
+
+              {/* Security Authorization PIN Verification */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-[#004732]" />
+                    <span>Security Authorization PIN</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400 font-mono">4-digit code (0502)</span>
+                </div>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  placeholder="Enter 4-digit PIN (••••)"
+                  value={securityPin}
+                  onChange={(e) => {
+                    setSecurityPin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                    if (pinError) setPinError(null);
+                  }}
+                  required
+                  className={`w-full px-3 py-2 border rounded text-sm font-mono tracking-widest text-slate-900 bg-white focus:outline-none focus:border-[#004732] ${
+                    pinError ? 'border-rose-500 bg-rose-50/50 ring-1 ring-rose-500' : 'border-slate-300'
+                  }`}
+                />
+                {pinError && (
+                  <p className="text-[11px] text-rose-600 font-medium mt-1.5 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{pinError}</span>
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-3 pt-2">

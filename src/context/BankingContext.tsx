@@ -144,7 +144,7 @@ const DEFAULT_USER: UserProfile = {
   privateBankerEmail: 'customercare@tompkinsbank.com',
   privateBankerPhone: 'WhatsApp Only: +1 (607) 273-2265 (No Voice Calls)',
   ssnMasked: '•••-••-6110',
-  dateOfBirth: 'March 14, 1993',
+  dateOfBirth: 'February 5, 2002',
   twoFactorEnabled: true,
   biometricEnabled: true,
   paperlessStatements: true,
@@ -156,7 +156,7 @@ const DEFAULT_USER: UserProfile = {
 export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.LOGGED_IN);
-    return saved !== null ? JSON.parse(saved) : true; // Default to true so user immediately sees functional banking
+    return saved !== null ? JSON.parse(saved) : false; // Clean public landing page when unauthenticated
   });
 
   const [activePortalTab, setActivePortalTab] = useState<string>('overview');
@@ -167,7 +167,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const saved = localStorage.getItem(STORAGE_KEYS.USER);
     if (!saved) return DEFAULT_USER;
     try {
-      return { ...DEFAULT_USER, ...JSON.parse(saved) };
+      return { ...DEFAULT_USER, ...JSON.parse(saved), dateOfBirth: 'February 5, 2002' };
     } catch {
       return DEFAULT_USER;
     }
@@ -191,11 +191,13 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const rawList: Transaction[] = saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
     const seen = new Set<string>();
     return rawList.map((tx, idx) => {
-      if (seen.has(tx.id)) {
-        return { ...tx, id: `${tx.id}_uniq_${idx}` };
+      let finalDate = tx.date;
+      if (finalDate > '2026-09-17') {
+        finalDate = '2026-09-17';
       }
-      seen.add(tx.id);
-      return tx;
+      const uniqueId = seen.has(tx.id) ? `${tx.id}_uniq_${idx}` : tx.id;
+      seen.add(uniqueId);
+      return { ...tx, id: uniqueId, date: finalDate };
     });
   });
 
@@ -294,7 +296,11 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
             setAccounts(data.accounts);
           }
           if (data.transactions && Array.isArray(data.transactions)) {
-            setTransactions(data.transactions);
+            const normalizedTxs = data.transactions.map((t: Transaction) => ({
+              ...t,
+              date: t.date > '2026-09-17' ? '2026-09-17' : t.date,
+            }));
+            setTransactions(normalizedTxs);
           }
           if (data.cards && Array.isArray(data.cards)) {
             setCards(data.cards);
@@ -315,7 +321,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
             setSupportMessages(data.supportMessages);
           }
           if (data.user && typeof data.user === 'object') {
-            setUser((prev) => ({ ...prev, ...data.user }));
+            setUser((prev) => ({ ...prev, ...data.user, dateOfBirth: 'February 5, 2002' }));
           }
 
           setTimeout(() => {
@@ -615,6 +621,10 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     if (payload.amount <= 0) {
       return { success: false, message: 'Transfer amount must be greater than $0.00' };
+    }
+
+    if (payload.securityPin !== undefined && payload.securityPin.trim() !== '0502') {
+      return { success: false, message: 'Invalid 4-digit Security PIN. Authorization denied.' };
     }
 
     const txDate = new Date().toISOString().split('T')[0];

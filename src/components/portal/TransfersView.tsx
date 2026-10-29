@@ -10,6 +10,7 @@ import {
   Building,
   User,
   Zap,
+  Lock,
 } from 'lucide-react';
 import { TransferRequest } from '../../types/banking';
 
@@ -21,6 +22,7 @@ export const TransfersView: React.FC = () => {
   const [toAccount, setToAccount] = useState<string>(accounts[1]?.id || '');
   const [amount, setAmount] = useState<string>('500.00');
   const [memo, setMemo] = useState<string>('');
+  const [securityPin, setSecurityPin] = useState<string>('');
   const [speed, setSpeed] = useState<'instant' | 'standard'>('instant');
 
   // External Wire State
@@ -66,6 +68,16 @@ export const TransfersView: React.FC = () => {
       return;
     }
 
+    if (!securityPin.trim()) {
+      setFeedback({ success: false, message: 'Please enter your 4-digit Security PIN.' });
+      return;
+    }
+
+    if (securityPin.trim() !== '0502') {
+      setFeedback({ success: false, message: 'Invalid Security PIN. Authorization denied (PIN: 0502).' });
+      return;
+    }
+
     setIsProcessing(true);
     setFeedback(null);
 
@@ -81,6 +93,7 @@ export const TransfersView: React.FC = () => {
         externalRouting: transferType === 'external' ? externalRouting : undefined,
         externalAccount: transferType === 'external' ? externalAccount : undefined,
         speed,
+        securityPin: securityPin.trim(),
       };
 
       const result = executeTransfer(payload);
@@ -400,6 +413,28 @@ export const TransfersView: React.FC = () => {
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-emerald-400"
+          />
+        </div>
+
+        {/* Security Authorization PIN */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Security Authorization PIN</span>
+            </label>
+            <span className="text-[11px] text-slate-500 font-mono">4-digit code (0502)</span>
+          </div>
+          <input
+            type="password"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={4}
+            placeholder="Enter 4-digit PIN (••••)"
+            value={securityPin}
+            onChange={(e) => setSecurityPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            required
+            className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm font-mono tracking-widest text-white focus:outline-none focus:border-emerald-400"
           />
         </div>
 

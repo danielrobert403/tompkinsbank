@@ -136,6 +136,7 @@ export interface TransferRequest {
   externalAccount?: string;
   speed: 'instant' | 'standard';
   wireType?: 'ach' | 'wire_domestic' | 'fednow';
+  securityPin?: string;
   requireReview?: boolean;
 }
 

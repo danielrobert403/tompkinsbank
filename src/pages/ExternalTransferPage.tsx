@@ -38,6 +38,8 @@ export const ExternalTransferPage: React.FC = () => {
   const [amount, setAmount] = useState('');
   const [wireType, setWireType] = useState<'wire_domestic' | 'fednow' | 'ach'>('wire_domestic');
   const [memo, setMemo] = useState('');
+  const [securityPin, setSecurityPin] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [receipt, setReceipt] = useState<{
@@ -125,6 +127,17 @@ export const ExternalTransferPage: React.FC = () => {
       return;
     }
 
+    if (!securityPin.trim()) {
+      setPinError('Please enter your 4-digit Security PIN.');
+      return;
+    }
+
+    if (securityPin.trim() !== '0502') {
+      setPinError('Invalid Security PIN. Authorization denied (PIN: 0502).');
+      return;
+    }
+
+    setPinError(null);
     setIsSubmitting(true);
 
     setTimeout(() => {
@@ -139,6 +152,7 @@ export const ExternalTransferPage: React.FC = () => {
         externalAccount: accountNumber.trim(),
         speed: wireType === 'ach' ? 'standard' : 'instant',
         wireType,
+        securityPin: securityPin.trim(),
       });
 
       setIsSubmitting(false);
@@ -489,6 +503,41 @@ export const ExternalTransferPage: React.FC = () => {
                 </div>
               </div>
 
+            </div>
+
+            {/* Step 5: Security Authorization PIN */}
+            <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-[#004732] text-white flex items-center justify-center text-xs font-bold">5</span>
+                  <span>Security Authorization PIN</span>
+                </h2>
+                <span className="text-xs text-slate-400 font-mono">4-digit code (0502)</span>
+              </div>
+              <div className="max-w-xs">
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  placeholder="Enter 4-digit PIN (••••)"
+                  value={securityPin}
+                  onChange={(e) => {
+                    setSecurityPin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                    if (pinError) setPinError(null);
+                  }}
+                  required
+                  className={`w-full px-3 py-2 border rounded font-mono text-base tracking-widest text-slate-900 focus:outline-none focus:border-[#004732] ${
+                    pinError ? 'border-rose-500 bg-rose-50/50 ring-1 ring-rose-500' : 'border-slate-300'
+                  }`}
+                />
+                {pinError && (
+                  <p className="text-xs text-rose-600 font-medium mt-1.5 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{pinError}</span>
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Submit Action */}

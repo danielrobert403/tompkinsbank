@@ -520,7 +520,7 @@ export const ProfilePage: React.FC = () => {
                     <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider block">Date of Birth</span>
                     <p className="text-sm font-semibold text-slate-900 mt-0.5 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-slate-400" />
-                      <span>{user.dateOfBirth || 'October 14, 1988'}</span>
+                      <span>{user.dateOfBirth || 'February 5, 2002'}</span>
                     </p>
                   </div>
 

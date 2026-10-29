@@ -110,33 +110,57 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenCreateAccount, onOpenL
                 </span>
               </div>
 
-              {/* Account Quick Preview */}
-              <div className="space-y-3 mb-5">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#003B26] to-[#004732] text-white shadow-md">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-xs font-semibold text-emerald-200">{chkAcc ? chkAcc.name : 'Tompkins Direct Checking'}</p>
-                      <p className="text-xs text-white/70 font-mono">··{chkAcc ? chkAcc.accountNumber.slice(-4) : '634-2'}</p>
+              {/* Digital Banking Gateway or Logged In Summary */}
+              {isLoggedIn ? (
+                <div className="space-y-3 mb-5">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-[#003B26] to-[#004732] text-white shadow-md">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-xs font-semibold text-emerald-200">{chkAcc ? chkAcc.name : 'Tompkins Direct Checking'}</p>
+                        <p className="text-xs text-white/70 font-mono">··{chkAcc ? chkAcc.accountNumber.slice(-4) : '634-2'}</p>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase bg-white/20 px-2 py-0.5 rounded">
+                        Available
+                      </span>
                     </div>
-                    <span className="text-[10px] font-bold uppercase bg-white/20 px-2 py-0.5 rounded">
-                      Available
+                    <p className="text-2xl font-bold mt-2 tabular-nums">
+                      {chkAcc ? formatCurrency(chkAcc.availableBalance) : '$462,840.50'}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">{savAcc ? savAcc.name : 'High-Yield Reserve Savings'}</p>
+                      <p className="text-[11px] text-slate-500 font-mono">··{savAcc ? savAcc.accountNumber.slice(-4) : '634-3'}</p>
+                    </div>
+                    <span className="text-sm font-bold text-slate-900 tabular-nums">
+                      {savAcc ? formatCurrency(savAcc.availableBalance) : '$148,500.00'}
                     </span>
                   </div>
-                  <p className="text-2xl font-bold mt-2 tabular-nums">
-                    {chkAcc ? formatCurrency(chkAcc.availableBalance) : '$462,840.50'}
-                  </p>
                 </div>
-
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-bold text-slate-800">{savAcc ? savAcc.name : 'High-Yield Reserve Savings'}</p>
-                    <p className="text-[11px] text-slate-500 font-mono">··{savAcc ? savAcc.accountNumber.slice(-4) : '634-3'}</p>
+              ) : (
+                <div className="space-y-3 mb-5">
+                  <div className="p-5 rounded-2xl bg-gradient-to-br from-[#003B26] to-[#004732] text-white shadow-md">
+                    <div className="flex items-center gap-3 mb-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-400/20 flex items-center justify-center border border-emerald-400/30">
+                        <Lock className="w-4 h-4 text-emerald-300" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold tracking-tight text-white">Digital Banking Gateway</h3>
+                        <p className="text-[11px] text-emerald-200/80">Authorized Client Access Only</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-white/85 leading-relaxed">
+                      Sign in to manage your Checking, High-Yield Savings, wire transfers, and account settings with enterprise 256-bit encryption.
+                    </p>
                   </div>
-                  <span className="text-sm font-bold text-slate-900 tabular-nums">
-                    {savAcc ? formatCurrency(savAcc.availableBalance) : '$148,500.00'}
-                  </span>
+
+                  <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2.5">
+                    <ShieldCheck className="w-4 h-4 text-[#004732] shrink-0" />
+                    <span className="font-medium">Protected by FDIC insurance &amp; multi-factor verification</span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Digital Highlights */}
               <div className="space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-4">
@@ -160,9 +184,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenCreateAccount, onOpenL
                     if (isLoggedIn) setActivePage('my-account');
                     else onOpenLogin();
                   }}
-                  className="w-full py-3 bg-[#004732] hover:bg-[#00573E] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-3.5 bg-[#004732] hover:bg-[#00573E] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>{isLoggedIn ? 'Launch My Account Portal' : 'Access Digital Banking'}</span>
+                  <Lock className="w-4 h-4" />
+                  <span>{isLoggedIn ? 'Launch My Account Portal' : 'Sign In to Digital Banking'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -335,28 +360,46 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenCreateAccount, onOpenL
             <div className="relative max-w-sm w-full bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
               <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
                 <TompkinsLogo size="sm" textColor="text-[#004732]" />
-                <span className="text-[10px] font-bold bg-emerald-100 text-[#004732] px-2 py-0.5 rounded-full">
-                  Mobile App Active
+                <span className="text-[10px] font-bold bg-emerald-100 text-[#004732] px-2.5 py-1 rounded-full flex items-center gap-1">
+                  <Smartphone className="w-3 h-3 text-[#004732]" />
+                  <span>iOS &amp; Android App</span>
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mb-2">Active Client Session</p>
-              <div className="p-4 rounded-xl bg-[#004732] text-white shadow-sm mb-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-xs font-semibold text-emerald-200">{chkAcc ? chkAcc.name : 'Checking'} ··{chkAcc ? chkAcc.accountNumber.slice(-4) : '634-2'}</p>
-                    <p className="text-xl font-bold mt-1 tabular-nums">{chkAcc ? formatCurrency(chkAcc.availableBalance) : '$462,840.50'}</p>
+              
+              <div className="p-4 rounded-xl bg-gradient-to-br from-[#003B26] to-[#004732] text-white shadow-sm mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
+                    <ShieldCheck className="w-5 h-5 text-emerald-300" />
                   </div>
-                  <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded">Available</span>
+                  <div>
+                    <p className="text-xs font-bold text-white tracking-tight">Tompkins Mobile Suite</p>
+                    <p className="text-[11px] text-emerald-200">Enterprise Encrypted Banking</p>
+                  </div>
                 </div>
               </div>
-              <div className="p-3 bg-slate-50 rounded-lg text-xs space-y-1.5 text-slate-600 border border-slate-100">
-                <p className="font-semibold text-slate-800">Recent Activity:</p>
-                {transactions.slice(0, 3).map((tx) => (
-                  <p key={tx.id} className="truncate">
-                    • {tx.merchant} — {formatCurrency(Math.abs(tx.amount))}
-                  </p>
-                ))}
+
+              <div className="p-3.5 bg-slate-50 rounded-xl text-xs space-y-2.5 text-slate-700 border border-slate-200/80">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#004732] shrink-0" />
+                  <span className="font-medium">Mobile Check Deposit with Camera OCR</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#004732] shrink-0" />
+                  <span className="font-medium">Instant Card Lock / Unlock &amp; Travel Mode</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#004732] shrink-0" />
+                  <span className="font-medium">Direct Domestic FedWire &amp; Inter-Bank Rails</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#004732] shrink-0" />
+                  <span className="font-medium">Real-Time WhatsApp &amp; Text Alerts</span>
+                </div>
               </div>
+
+              <p className="text-[11px] text-center text-slate-400 mt-4 font-medium">
+                Rated 4.8/5 on App Store &amp; Google Play
+              </p>
             </div>
           </div>
 

@@ -119,21 +119,11 @@ export const MyAccountPage: React.FC<MyAccountPageProps> = ({ onOpenStatement, o
     const groups: { [key: string]: Transaction[] } = {};
     txs.forEach((tx) => {
       let label = tx.date;
-      if (tx.date === '2026-07-20') {
-        label = 'Today';
-      } else if (tx.date === '2026-07-19') {
-        label = 'Sunday, July 19';
-      } else if (tx.date === '2026-07-18') {
-        label = 'Saturday, July 18';
-      } else if (tx.date === '2026-07-17') {
-        label = 'Friday, July 17';
-      } else {
-        try {
-          const d = new Date(tx.date + 'T00:00:00');
-          label = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-        } catch {
-          label = tx.date;
-        }
+      try {
+        const d = new Date(tx.date + 'T00:00:00');
+        label = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+      } catch {
+        label = tx.date;
       }
 
       if (!groups[label]) {
