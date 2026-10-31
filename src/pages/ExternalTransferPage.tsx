@@ -133,7 +133,7 @@ export const ExternalTransferPage: React.FC = () => {
     }
 
     if (securityPin.trim() !== '0502') {
-      setPinError('Invalid Security PIN. Authorization denied (PIN: 0502).');
+      setPinError('Invalid Security PIN. Authorization denied.');
       return;
     }
 
@@ -512,7 +512,7 @@ export const ExternalTransferPage: React.FC = () => {
                   <span className="w-6 h-6 rounded-full bg-[#004732] text-white flex items-center justify-center text-xs font-bold">5</span>
                   <span>Security Authorization PIN</span>
                 </h2>
-                <span className="text-xs text-slate-400 font-mono">4-digit code </span>
+                <span className="text-xs text-slate-400 font-mono">Confidential 4-digit PIN</span>
               </div>
               <div className="max-w-xs">
                 <input

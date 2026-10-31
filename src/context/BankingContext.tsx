@@ -113,17 +113,17 @@ interface BankingContextType {
 const BankingContext = createContext<BankingContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  USER: 'tompkins_bank_user_profile_v5',
-  ACCOUNTS: 'tompkins_bank_accounts_v5',
-  TRANSACTIONS: 'tompkins_bank_txs_v5',
-  CARDS: 'tompkins_bank_cards_v5',
-  PAYEES: 'tompkins_bank_payees_v5',
-  GOALS: 'tompkins_bank_goals_v5',
-  NOTIFICATIONS: 'tompkins_bank_notifs_v5',
-  LOGGED_IN: 'tompkins_bank_auth_state_v5',
-  ADMIN_LOGGED_IN: 'tompkins_bank_admin_auth_v5',
-  PENDING_CHANGES: 'tompkins_bank_pending_changes_v5',
-  SUPPORT_MESSAGES: 'tompkins_bank_support_messages_v5',
+  USER: 'tompkins_bank_user_profile_v6',
+  ACCOUNTS: 'tompkins_bank_accounts_v6',
+  TRANSACTIONS: 'tompkins_bank_txs_v6',
+  CARDS: 'tompkins_bank_cards_v6',
+  PAYEES: 'tompkins_bank_payees_v6',
+  GOALS: 'tompkins_bank_goals_v6',
+  NOTIFICATIONS: 'tompkins_bank_notifs_v6',
+  LOGGED_IN: 'tompkins_bank_auth_state_v6',
+  ADMIN_LOGGED_IN: 'tompkins_bank_admin_auth_v6',
+  PENDING_CHANGES: 'tompkins_bank_pending_changes_v6',
+  SUPPORT_MESSAGES: 'tompkins_bank_support_messages_v6',
 };
 
 const DEFAULT_USER: UserProfile = {
@@ -293,6 +293,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const isRemoteSyncRef = useRef<boolean>(false);
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasLoadedRemoteRef = useRef<boolean>(false);
 
   // Cross-device real-time sync with Firebase Firestore
   useEffect(() => {
@@ -345,9 +346,11 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
             setUser((prev) => ({ ...prev, ...data.user, dateOfBirth: 'February 5, 2002' }));
           }
 
+          hasLoadedRemoteRef.current = true;
+
           setTimeout(() => {
             isRemoteSyncRef.current = false;
-          }, 350);
+          }, 400);
         } else {
           // Initialize remote shared document with initial state on first boot
           setDoc(mainStateRef, {
@@ -361,13 +364,17 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
             supportMessages,
             user,
             updatedAt: new Date().toISOString(),
+          }).then(() => {
+            hasLoadedRemoteRef.current = true;
           }).catch((err) => {
             console.warn('Initial Firestore seeding notice:', err.message);
+            hasLoadedRemoteRef.current = true;
           });
         }
       },
       (error) => {
         console.warn('Firestore real-time sync notice:', error.message);
+        hasLoadedRemoteRef.current = true;
       }
     );
 
@@ -376,6 +383,9 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Broadcast any local mutations to Firestore so laptop, phone, and tablet stay completely aligned
   useEffect(() => {
+    // CRITICAL: NEVER broadcast to Firestore before the initial remote snapshot has loaded!
+    // Otherwise a newly opened device with stale local cache will overwrite the live shared database.
+    if (!hasLoadedRemoteRef.current) return;
     if (isRemoteSyncRef.current) return;
 
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
@@ -461,6 +471,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (cleanUser === 'paulina villarreal' && cleanPass === '27girlsplay') {
       setIsLoggedIn(true);
       setIsAdminLoggedIn(false);
+      sessionStorage.setItem('tompkins_bank_session_active', 'true');
       localStorage.setItem(STORAGE_KEYS.LOGGED_IN, JSON.stringify(true));
       setActivePage('my-account');
       return { success: true, message: 'Welcome back, Paulina!', isAdmin: false };
@@ -472,6 +483,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       (cleanPass === 'admin' || cleanPass === '27girlsplay' || cleanPass === 'admin2026')
     ) {
       setIsAdminLoggedIn(true);
+      sessionStorage.setItem('tompkins_bank_session_active', 'true');
       localStorage.setItem(STORAGE_KEYS.ADMIN_LOGGED_IN, JSON.stringify(true));
       setActivePage('admin-dashboard');
       return { success: true, message: 'Operations Portal Authorized.', isAdmin: true };
@@ -485,12 +497,14 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const logout = () => {
     setIsLoggedIn(false);
+    sessionStorage.removeItem('tompkins_bank_session_active');
     localStorage.setItem(STORAGE_KEYS.LOGGED_IN, JSON.stringify(false));
     setActivePage('login');
   };
 
   const logoutAdmin = () => {
     setIsAdminLoggedIn(false);
+    sessionStorage.removeItem('tompkins_bank_session_active');
     localStorage.setItem(STORAGE_KEYS.ADMIN_LOGGED_IN, JSON.stringify(false));
     setActivePage('login');
   };
