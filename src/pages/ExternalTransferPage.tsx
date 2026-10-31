@@ -42,16 +42,6 @@ export const ExternalTransferPage: React.FC = () => {
   const [pinError, setPinError] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [receipt, setReceipt] = useState<{
-    success: boolean;
-    message: string;
-    ref?: string;
-    amount: number;
-    bankName: string;
-    routing: string;
-    accountMasked: string;
-    status: string;
-  } | null>(null);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -158,18 +148,9 @@ export const ExternalTransferPage: React.FC = () => {
       setIsSubmitting(false);
 
       if (res.success) {
-        setReceipt({
-          success: true,
-          message: res.message,
-          ref: res.transactionId,
-          amount: numAmount,
-          bankName: bankQuery.trim(),
-          routing: routingNumber.trim(),
-          accountMasked: `••••${accountNumber.slice(-4)}`,
-          status: 'Pending',
-        });
+        setActivePage('my-account');
       }
-    }, 700);
+    }, 400);
   };
 
   return (
@@ -207,8 +188,7 @@ export const ExternalTransferPage: React.FC = () => {
           </div>
         </div>
 
-        {!receipt ? (
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
             
             {/* Step 1: Source Account */}
             <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-xs space-y-4">
@@ -505,12 +485,12 @@ export const ExternalTransferPage: React.FC = () => {
 
             </div>
 
-            {/* Step 5: Security Authorization PIN */}
+            {/* Step 5: Security PIN */}
             <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-[#004732] text-white flex items-center justify-center text-xs font-bold">5</span>
-                  <span>Security Authorization PIN</span>
+                  <span>Security PIN</span>
                 </h2>
                 <span className="text-xs text-slate-400 font-mono">Confidential 4-digit PIN</span>
               </div>
@@ -547,79 +527,15 @@ export const ExternalTransferPage: React.FC = () => {
               className="w-full py-3.5 bg-[#004732] hover:bg-[#003828] active:bg-[#002B1F] text-white text-sm font-semibold rounded-md shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isSubmitting ? (
-                <span>Submitting Transfer Request...</span>
+                <span>Processing Transfer...</span>
               ) : (
                 <>
-                  <span>Submit Transfer for Authorization</span>
+                  <span>Transfer Funds</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
-        ) : (
-          /* Confirmation Receipt */
-          <div className="bg-white p-8 rounded-lg border border-slate-200 shadow-xs max-w-xl mx-auto space-y-6 text-center animate-in zoom-in-95">
-            <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 text-[#004732] flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900">Transfer Submitted</h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Your transfer request has been recorded and submitted for administrative approval.
-              </p>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded border border-slate-200 text-xs font-mono text-left space-y-2">
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-sans">Destination Bank:</span>
-                <span className="font-bold text-slate-900">{receipt.bankName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-sans">ABA Routing Number:</span>
-                <span className="text-slate-900">{receipt.routing}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-sans">Account:</span>
-                <span className="text-slate-900">{receipt.accountMasked}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-sans">Amount:</span>
-                <span className="text-[#004732] font-bold text-sm">
-                  {formatCurrency(receipt.amount)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-sans">Reference ID:</span>
-                <span className="text-slate-800">{receipt.ref}</span>
-              </div>
-              <div className="flex justify-between pt-2 border-t border-slate-200 font-sans">
-                <span className="text-slate-500">Current Status:</span>
-                <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                  {receipt.status}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => {
-                  setReceipt(null);
-                  handleClearBank();
-                }}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-md transition-colors"
-              >
-                Send Another Transfer
-              </button>
-              <button
-                onClick={() => setActivePage('my-account')}
-                className="flex-1 py-2.5 bg-[#004732] hover:bg-[#003828] text-white text-xs font-semibold rounded-md transition-colors"
-              >
-                Return to My Account
-              </button>
-            </div>
-          </div>
-        )}
 
       </div>
     </div>

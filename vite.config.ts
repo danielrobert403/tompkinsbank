@@ -21,7 +21,7 @@ export default defineConfig(() => {
     },
     preview: {
       host: '0.0.0.0',
-      allowedHosts: ['tompkinsbank.onrender.com', '.onrender.com', 'localhost', '127.0.0.1'],
+      allowedHosts: true as const,
     },
   };
 });

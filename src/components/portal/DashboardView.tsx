@@ -313,9 +313,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenAccount, onO
                   >
                     {tx.amount > 0 ? `+${formatCurrency(tx.amount)}` : formatCurrency(tx.amount)}
                   </p>
-                  <span className="text-[10px] text-slate-400 font-medium">
-                    {tx.status === 'cleared' ? 'Cleared' : 'Pending'}
-                  </span>
+                  {tx.status === 'pending' || tx.status === 'held' ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                      Pending
+                    </span>
+                  ) : tx.status === 'cleared' ? (
+                    <span className="text-[10px] text-slate-400 font-medium">Cleared</span>
+                  ) : (
+                    <span className="text-[10px] text-rose-400 font-medium">Declined</span>
+                  )}
                 </div>
               </div>
             ))}

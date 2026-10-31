@@ -7,8 +7,8 @@ export const INITIAL_ACCOUNTS: BankAccount[] = [
     accountNumber: '6110634-2',
     routingNumber: '021302564',
     type: 'checking',
-    balance: 82000.00,
-    availableBalance: 82000.00,
+    balance: 95000.00,
+    availableBalance: 95000.00,
     interestRate: 0.25,
     colorTheme: 'emerald',
   },
@@ -99,6 +99,19 @@ export const INITIAL_CARDS: PaymentCard[] = [
 ];
 
 export const INITIAL_TRANSACTIONS: Transaction[] = [
+  {
+    id: 'tx_mus_spotify_oct30',
+    accountId: 'acc_chk_01',
+    accountName: 'Checking',
+    date: '2026-10-30',
+    merchant: 'Spotify Earnings',
+    description: 'Electronic ACH Direct Deposit: Spotify Artist Royalty Earnings & Streaming Revenue',
+    amount: 13000.00,
+    runningBalance: 95000.00,
+    category: 'Income & Salary',
+    type: 'credit',
+    status: 'cleared',
+  },
   {
     id: 'tx_mus_01',
     accountId: 'acc_chk_01',

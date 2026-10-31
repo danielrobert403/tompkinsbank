@@ -176,17 +176,9 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
       setIsSubmitting(false);
 
       if (res.success) {
-        setTransferReceipt({
-          success: true,
-          message: res.message,
-          ref: res.transactionId,
-          amount: numAmount,
-          destination: `${bankQuery.trim()} (··${accountNumber.slice(-4)})`,
-          status: 'pending',
-          rail: wireRail === 'wire_domestic' ? 'Domestic FedWire' : wireRail === 'fednow' ? 'FedNow Instant' : 'Standard ACH',
-        });
+        onClose();
       }
-    }, 600);
+    }, 400);
   };
 
   const handleInternalSubmit = (e: React.FormEvent) => {
@@ -235,18 +227,9 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
       setIsSubmitting(false);
 
       if (res.success) {
-        const toAcc = accounts.find((a) => a.id === toAccountId);
-        setTransferReceipt({
-          success: true,
-          message: res.message,
-          ref: res.transactionId,
-          amount: numAmount,
-          destination: toAcc?.name || 'Destination Account',
-          status: 'pending',
-          rail: 'Internal Account Transfer',
-        });
+        onClose();
       }
-    }, 600);
+    }, 400);
   };
 
   const handleResetForm = () => {
@@ -603,12 +586,12 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
                 </div>
               </div>
 
-              {/* 6. Security Authorization PIN Verification */}
+              {/* 6. Security PIN Verification */}
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg">
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
                     <Lock className="w-3.5 h-3.5 text-[#004732]" />
-                    <span>Security Authorization PIN</span>
+                    <span>Security PIN</span>
                   </label>
                   <span className="text-[11px] text-slate-400 font-mono">Confidential 4-digit PIN</span>
                 </div>
@@ -651,10 +634,10 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
                   className="flex-1 py-2.5 bg-[#004732] hover:bg-[#003828] text-white text-xs font-bold rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {isSubmitting ? (
-                    <span>Submitting Transfer...</span>
+                    <span>Processing Transfer...</span>
                   ) : (
                     <>
-                      <span>Authorize &amp; Submit Transfer</span>
+                      <span>Transfer Funds</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -727,12 +710,12 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
                 </div>
               </div>
 
-              {/* Security Authorization PIN Verification */}
+              {/* Security PIN Verification */}
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg">
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
                     <Lock className="w-3.5 h-3.5 text-[#004732]" />
-                    <span>Security Authorization PIN</span>
+                    <span>Security PIN</span>
                   </label>
                   <span className="text-[11px] text-slate-400 font-mono">Confidential 4-digit PIN</span>
                 </div>
@@ -773,7 +756,7 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
                   disabled={isSubmitting}
                   className="flex-1 py-2.5 bg-[#004732] hover:bg-[#003828] text-white text-xs font-bold rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Submitting Transfer...' : 'Submit Transfer'}
+                  {isSubmitting ? 'Processing Transfer...' : 'Transfer Funds'}
                 </button>
               </div>
             </form>

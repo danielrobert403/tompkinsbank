@@ -113,17 +113,17 @@ interface BankingContextType {
 const BankingContext = createContext<BankingContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  USER: 'tompkins_bank_user_profile_v6',
-  ACCOUNTS: 'tompkins_bank_accounts_v6',
-  TRANSACTIONS: 'tompkins_bank_txs_v6',
-  CARDS: 'tompkins_bank_cards_v6',
-  PAYEES: 'tompkins_bank_payees_v6',
-  GOALS: 'tompkins_bank_goals_v6',
-  NOTIFICATIONS: 'tompkins_bank_notifs_v6',
-  LOGGED_IN: 'tompkins_bank_auth_state_v6',
-  ADMIN_LOGGED_IN: 'tompkins_bank_admin_auth_v6',
-  PENDING_CHANGES: 'tompkins_bank_pending_changes_v6',
-  SUPPORT_MESSAGES: 'tompkins_bank_support_messages_v6',
+  USER: 'tompkins_bank_user_profile_v7',
+  ACCOUNTS: 'tompkins_bank_accounts_v7',
+  TRANSACTIONS: 'tompkins_bank_txs_v7',
+  CARDS: 'tompkins_bank_cards_v7',
+  PAYEES: 'tompkins_bank_payees_v7',
+  GOALS: 'tompkins_bank_goals_v7',
+  NOTIFICATIONS: 'tompkins_bank_notifs_v7',
+  LOGGED_IN: 'tompkins_bank_auth_state_v7',
+  ADMIN_LOGGED_IN: 'tompkins_bank_admin_auth_v7',
+  PENDING_CHANGES: 'tompkins_bank_pending_changes_v7',
+  SUPPORT_MESSAGES: 'tompkins_bank_support_messages_v7',
 };
 
 const DEFAULT_USER: UserProfile = {
@@ -190,7 +190,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const raw: BankAccount[] = saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
     return raw.map((a) => {
       if (a.id === 'acc_chk_01' || a.type === 'checking') {
-        return { ...a, balance: 82000.00, availableBalance: 82000.00 };
+        return { ...a, balance: 95000.00, availableBalance: 95000.00 };
       }
       return a;
     });
@@ -198,20 +198,36 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
-    const rawList: Transaction[] = saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
+    let rawList: Transaction[] = saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
+    // Clear all pending transactions
+    rawList = rawList.filter((tx) => tx.status !== 'pending' && tx.status !== 'held');
+    const hasSpotify = rawList.some(
+      (tx) => tx.id === 'tx_mus_spotify_oct30' || (tx.date === '2026-10-30' && tx.amount === 13000)
+    );
+    if (!hasSpotify) {
+      rawList = [
+        {
+          id: 'tx_mus_spotify_oct30',
+          accountId: 'acc_chk_01',
+          accountName: 'Checking',
+          date: '2026-10-30',
+          merchant: 'Spotify Earnings',
+          description: 'Electronic ACH Direct Deposit: Spotify Artist Royalty Earnings & Streaming Revenue',
+          amount: 13000.00,
+          runningBalance: 95000.00,
+          category: 'Income & Salary',
+          type: 'credit',
+          status: 'cleared',
+        },
+        ...rawList,
+      ];
+    }
     const seen = new Set<string>();
-    // Clear all pending transactions and ensure dates are capped at 2026-09-17
-    return rawList
-      .filter((tx) => tx.status !== 'pending')
-      .map((tx, idx) => {
-        let finalDate = tx.date;
-        if (finalDate > '2026-09-17') {
-          finalDate = '2026-09-17';
-        }
-        const uniqueId = seen.has(tx.id) ? `${tx.id}_uniq_${idx}` : tx.id;
-        seen.add(uniqueId);
-        return { ...tx, id: uniqueId, date: finalDate };
-      });
+    return rawList.map((tx, idx) => {
+      const uniqueId = seen.has(tx.id) ? `${tx.id}_uniq_${idx}` : tx.id;
+      seen.add(uniqueId);
+      return { ...tx, id: uniqueId };
+    });
   });
 
   const [cards, setCards] = useState<PaymentCard[]>(() => {
@@ -307,22 +323,61 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           isRemoteSyncRef.current = true;
 
           if (data.accounts && Array.isArray(data.accounts)) {
-            const normalizedAccounts = data.accounts.map((a: BankAccount) => {
-              if (a.id === 'acc_chk_01' || a.type === 'checking') {
-                return { ...a, balance: 82000.00, availableBalance: 82000.00 };
-              }
-              return a;
-            });
-            setAccounts(normalizedAccounts);
+            if (data.schemaVersion !== 'v7_spotify_payout') {
+              const cleanedAccounts = data.accounts.map((a: BankAccount) => {
+                if (a.id === 'acc_chk_01' || a.type === 'checking') {
+                  return { ...a, balance: 95000.00, availableBalance: 95000.00 };
+                }
+                return a;
+              });
+              setAccounts(cleanedAccounts);
+            } else {
+              setAccounts(data.accounts);
+            }
           }
           if (data.transactions && Array.isArray(data.transactions)) {
-            const normalizedTxs = data.transactions
-              .filter((t: Transaction) => t.status !== 'pending')
-              .map((t: Transaction) => ({
-                ...t,
-                date: t.date > '2026-09-17' ? '2026-09-17' : t.date,
-              }));
-            setTransactions(normalizedTxs);
+            if (data.schemaVersion !== 'v7_spotify_payout') {
+              // Reset all old pending transactions as requested
+              let fixed = data.transactions.filter(
+                (t: Transaction) => t.status !== 'pending' && t.status !== 'held'
+              );
+              // Ensure Spotify payment on Oct 30 is present
+              const hasSpotify = fixed.some(
+                (t: Transaction) => t.id === 'tx_mus_spotify_oct30' || (t.date === '2026-10-30' && t.amount === 13000)
+              );
+              if (!hasSpotify) {
+                fixed.unshift({
+                  id: 'tx_mus_spotify_oct30',
+                  accountId: 'acc_chk_01',
+                  accountName: 'Checking',
+                  date: '2026-10-30',
+                  merchant: 'Spotify Earnings',
+                  description: 'Electronic ACH Direct Deposit: Spotify Artist Royalty Earnings & Streaming Revenue',
+                  amount: 13000.00,
+                  runningBalance: 95000.00,
+                  category: 'Income & Salary',
+                  type: 'credit',
+                  status: 'cleared',
+                });
+              }
+              setTransactions(fixed);
+              const cleanedAccs = (data.accounts || accounts).map((a: BankAccount) =>
+                a.id === 'acc_chk_01' || a.type === 'checking'
+                  ? { ...a, balance: 95000.00, availableBalance: 95000.00 }
+                  : a
+              );
+              // Immediately write back to Firestore with schemaVersion: 'v7_spotify_payout'
+              const mainStateRef = doc(db, 'banking_system', 'main_state');
+              setDoc(mainStateRef, {
+                ...data,
+                schemaVersion: 'v7_spotify_payout',
+                accounts: cleanedAccs,
+                transactions: fixed,
+                updatedAt: new Date().toISOString(),
+              }, { merge: true }).catch(console.warn);
+            } else {
+              setTransactions(data.transactions);
+            }
           }
           if (data.cards && Array.isArray(data.cards)) {
             setCards(data.cards);
@@ -354,6 +409,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } else {
           // Initialize remote shared document with initial state on first boot
           setDoc(mainStateRef, {
+            schemaVersion: 'v7_spotify_payout',
             accounts,
             transactions,
             cards,
@@ -640,6 +696,36 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }).format(amount);
   };
 
+  const syncImmediateToFirestore = (
+    updatedAccounts: BankAccount[],
+    updatedTransactions: Transaction[],
+    updatedNotifs?: BankNotification[]
+  ) => {
+    try {
+      const mainStateRef = doc(db, 'banking_system', 'main_state');
+      setDoc(
+        mainStateRef,
+        {
+          accounts: updatedAccounts,
+          transactions: updatedTransactions,
+          cards,
+          payees,
+          goals,
+          notifications: updatedNotifs || notifications,
+          pendingChanges,
+          supportMessages,
+          user,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      ).catch((err) => {
+        console.warn('Direct Firestore sync notice:', err.message);
+      });
+    } catch (e) {
+      console.warn('Firestore direct write exception:', e);
+    }
+  };
+
   const executeTransfer = (payload: TransferRequest) => {
     const fromAcc = accounts.find((a) => a.id === payload.fromAccountId);
     if (!fromAcc) {
@@ -662,7 +748,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return { success: false, message: 'Invalid 4-digit Security PIN. Authorization denied.' };
     }
 
-    const txDate = new Date().toISOString().split('T')[0];
+    const txDate = '2026-10-31';
     const txId = `tx_${Date.now()}`;
 
     // Handle Internal Transfer - Debits source immediately to reserve funds, queues as pending admin approval
@@ -672,15 +758,13 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return { success: false, message: 'Destination account not found.' };
       }
 
-      setAccounts((prev) =>
-        prev.map((acc) => {
-          if (acc.id === fromAcc.id) {
-            const newBal = acc.balance - payload.amount;
-            return { ...acc, balance: newBal, availableBalance: newBal };
-          }
-          return acc;
-        })
-      );
+      const updatedAccounts = accounts.map((acc) => {
+        if (acc.id === fromAcc.id) {
+          const newBal = acc.balance - payload.amount;
+          return { ...acc, balance: newBal, availableBalance: newBal };
+        }
+        return acc;
+      });
 
       const debitTx: Transaction = {
         id: `${txId}_deb`,
@@ -703,9 +787,8 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         },
       };
 
-      setTransactions((prev) => [debitTx, ...prev]);
+      const updatedTransactions = [debitTx, ...transactions];
 
-      // Notification
       const notif: BankNotification = {
         id: `notif_${Date.now()}`,
         title: 'Transfer Submitted — Pending Approval',
@@ -714,7 +797,13 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         type: 'transaction',
         read: false,
       };
-      setNotifications((prev) => [notif, ...prev]);
+
+      const updatedNotifs = [notif, ...notifications];
+
+      setAccounts(updatedAccounts);
+      setTransactions(updatedTransactions);
+      setNotifications(updatedNotifs);
+      syncImmediateToFirestore(updatedAccounts, updatedTransactions, updatedNotifs);
 
       return {
         success: true,
@@ -725,15 +814,13 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // Handle External ACH / Wire Transfer
     if (payload.type === 'external') {
-      setAccounts((prev) =>
-        prev.map((acc) => {
-          if (acc.id === fromAcc.id) {
-            const newBal = acc.balance - payload.amount;
-            return { ...acc, balance: newBal, availableBalance: newBal };
-          }
-          return acc;
-        })
-      );
+      const updatedAccounts = accounts.map((acc) => {
+        if (acc.id === fromAcc.id) {
+          const newBal = acc.balance - payload.amount;
+          return { ...acc, balance: newBal, availableBalance: newBal };
+        }
+        return acc;
+      });
 
       const recipient = payload.recipientName || 'External Beneficiary';
       const isWire = payload.wireType === 'wire_domestic';
@@ -766,7 +853,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         },
       };
 
-      setTransactions((prev) => [extTx, ...prev]);
+      const updatedTransactions = [extTx, ...transactions];
 
       const notif: BankNotification = {
         id: `notif_${Date.now()}`,
@@ -776,7 +863,13 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         type: 'transaction',
         read: false,
       };
-      setNotifications((prev) => [notif, ...prev]);
+
+      const updatedNotifs = [notif, ...notifications];
+
+      setAccounts(updatedAccounts);
+      setTransactions(updatedTransactions);
+      setNotifications(updatedNotifs);
+      syncImmediateToFirestore(updatedAccounts, updatedTransactions, updatedNotifs);
 
       return {
         success: true,
@@ -787,15 +880,13 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // Handle Apex Pay (P2P)
     if (payload.type === 'p2p') {
-      setAccounts((prev) =>
-        prev.map((acc) => {
-          if (acc.id === fromAcc.id) {
-            const newBal = acc.balance - payload.amount;
-            return { ...acc, balance: newBal, availableBalance: newBal };
-          }
-          return acc;
-        })
-      );
+      const updatedAccounts = accounts.map((acc) => {
+        if (acc.id === fromAcc.id) {
+          const newBal = acc.balance - payload.amount;
+          return { ...acc, balance: newBal, availableBalance: newBal };
+        }
+        return acc;
+      });
 
       const p2pRecipient = payload.recipientName || payload.recipientHandle || 'Apex Pay Recipient';
       const p2pTx: Transaction = {
@@ -819,7 +910,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         },
       };
 
-      setTransactions((prev) => [p2pTx, ...prev]);
+      const updatedTransactions = [p2pTx, ...transactions];
 
       const notif: BankNotification = {
         id: `notif_${Date.now()}`,
@@ -829,7 +920,13 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         type: 'transaction',
         read: false,
       };
-      setNotifications((prev) => [notif, ...prev]);
+
+      const updatedNotifs = [notif, ...notifications];
+
+      setAccounts(updatedAccounts);
+      setTransactions(updatedTransactions);
+      setNotifications(updatedNotifs);
+      syncImmediateToFirestore(updatedAccounts, updatedTransactions, updatedNotifs);
 
       return {
         success: true,
@@ -1233,103 +1330,108 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateTransferStatus = (txId: string, newStatus: TransactionStatus, reason?: string) => {
-    let affectedTx: Transaction | undefined;
+    const targetTx = transactions.find((tx) => tx.id === txId);
+    if (!targetTx) return;
 
-    setTransactions((prev) =>
-      prev.map((tx) => {
-        if (tx.id === txId) {
-          affectedTx = tx;
-          const updatedWireDetails = tx.wireDetails
-            ? {
-                ...tx.wireDetails,
-                adminHoldReason: reason || tx.wireDetails.adminHoldReason,
-                adminReviewedBy: 'Admin / Treasury Officer (You)',
-                adminReviewedAt: new Date().toLocaleString(),
-                clearanceCode: newStatus === 'cleared' ? `FEDWIRE-REL-${Math.floor(100000 + Math.random() * 900000)}` : undefined,
-              }
-            : undefined;
+    const clearanceCode = newStatus === 'cleared'
+      ? `FEDWIRE-REL-${Math.floor(100000 + Math.random() * 900000)}`
+      : undefined;
 
-          return {
-            ...tx,
-            status: newStatus,
-            wireDetails: updatedWireDetails,
-          };
-        }
-        return tx;
-      })
-    );
+    const updatedWireDetails = {
+      ...(targetTx.wireDetails || {
+        bankName: 'Tompkins Community Bank',
+        routingNumber: '021302564',
+        accountNumber: '••••4819',
+        beneficiaryName: targetTx.merchant,
+        transferType: 'wire_domestic' as const,
+      }),
+      adminHoldReason: reason || targetTx.wireDetails?.adminHoldReason,
+      adminReviewedBy: 'Operations Administrator',
+      adminReviewedAt: new Date().toLocaleString(),
+      clearanceCode: clearanceCode || targetTx.wireDetails?.clearanceCode,
+    };
+
+    let updatedTransactions: Transaction[] = transactions.map((tx) => {
+      if (tx.id === txId) {
+        return {
+          ...tx,
+          status: newStatus,
+          wireDetails: updatedWireDetails,
+        };
+      }
+      return tx;
+    });
+
+    let updatedAccounts = [...accounts];
+    let updatedNotifs = [...notifications];
 
     // If rejected, refund the funds back to the source account
-    if (newStatus === 'rejected' && affectedTx && affectedTx.amount < 0) {
-      const refundAmount = Math.abs(affectedTx.amount);
-      const accId = affectedTx.accountId;
-      setAccounts((prev) =>
-        prev.map((acc) => {
-          if (acc.id === accId) {
-            const newBal = acc.balance + refundAmount;
-            return { ...acc, balance: newBal, availableBalance: newBal };
-          }
-          return acc;
-        })
-      );
+    if (newStatus === 'rejected' && targetTx.amount < 0) {
+      const refundAmount = Math.abs(targetTx.amount);
+      const accId = targetTx.accountId;
+      updatedAccounts = updatedAccounts.map((acc) => {
+        if (acc.id === accId) {
+          const newBal = acc.balance + refundAmount;
+          return { ...acc, balance: newBal, availableBalance: newBal };
+        }
+        return acc;
+      });
 
       const refundNotif: BankNotification = {
         id: `notif_${Date.now()}`,
         title: 'Transfer Rejected & Balance Refunded',
-        message: `${formatCurrency(refundAmount)} from transfer #${txId.slice(-6)} has been refunded to your account. Note: ${reason || 'Rejected by Admin'}.`,
+        message: `${formatCurrency(refundAmount)} from transfer #${txId.slice(-6)} has been refunded to your account. Note: ${reason || 'Rejected by Operations'}.`,
         date: 'Just now',
         type: 'security',
         read: false,
       };
-      setNotifications((prev) => [refundNotif, ...prev]);
-    } else if (newStatus === 'cleared' && affectedTx) {
+      updatedNotifs = [refundNotif, ...updatedNotifs];
+    } else if (newStatus === 'cleared') {
       // If internal transfer, credit destination account
-      if (affectedTx.merchant.startsWith('Transfer to ') && affectedTx.amount < 0) {
-        const destAccountName = affectedTx.merchant.replace('Transfer to ', '').trim();
-        const transferAmt = Math.abs(affectedTx.amount);
-        const destAcc = accounts.find((a) =>
+      if (targetTx.merchant.startsWith('Transfer to ') && targetTx.amount < 0) {
+        const destAccountName = targetTx.merchant.replace('Transfer to ', '').trim();
+        const transferAmt = Math.abs(targetTx.amount);
+        const destAcc = updatedAccounts.find((a) =>
           a.name.toLowerCase().includes(destAccountName.toLowerCase()) ||
           destAccountName.toLowerCase().includes(a.name.toLowerCase())
         );
 
         if (destAcc) {
-          setAccounts((prev) =>
-            prev.map((a) => {
-              if (a.id === destAcc.id) {
-                const newBal = destAcc.type === 'credit'
-                  ? Math.max(0, a.balance - transferAmt)
-                  : a.balance + transferAmt;
-                return { ...a, balance: newBal, availableBalance: newBal };
-              }
-              return a;
-            })
-          );
+          updatedAccounts = updatedAccounts.map((a) => {
+            if (a.id === destAcc.id) {
+              const newBal = destAcc.type === 'credit'
+                ? Math.max(0, a.balance - transferAmt)
+                : a.balance + transferAmt;
+              return { ...a, balance: newBal, availableBalance: newBal };
+            }
+            return a;
+          });
 
           const creditTx: Transaction = {
-            id: `${affectedTx.id}_cred`,
+            id: `${targetTx.id}_cred`,
             accountId: destAcc.id,
             accountName: destAcc.name,
-            date: new Date().toISOString().split('T')[0],
-            merchant: `Transfer from ${affectedTx.accountName}`,
-            description: `Approved Internal Transfer from ${affectedTx.accountName}`,
+            date: '2026-09-17',
+            merchant: `Transfer from ${targetTx.accountName}`,
+            description: `Approved Internal Transfer from ${targetTx.accountName}`,
             amount: transferAmt,
             category: 'Transfers',
             type: 'credit',
             status: 'cleared',
           };
-          setTransactions((prev) => [creditTx, ...prev]);
+          updatedTransactions = [creditTx, ...updatedTransactions];
         }
       }
 
       const clearedNotif: BankNotification = {
         id: `notif_${Date.now()}`,
         title: 'Transfer Approved & Released',
-        message: `Transfer of ${formatCurrency(Math.abs(affectedTx.amount))} to ${affectedTx.merchant} has been approved and cleared by Operations.`,
+        message: `Transfer of ${formatCurrency(Math.abs(targetTx.amount))} to ${targetTx.merchant} has been approved and cleared by Operations.`,
         date: 'Just now',
         type: 'transaction',
         read: false,
       };
-      setNotifications((prev) => [clearedNotif, ...prev]);
+      updatedNotifs = [clearedNotif, ...updatedNotifs];
     } else if (newStatus === 'held' || newStatus === 'pending') {
       const heldNotif: BankNotification = {
         id: `notif_${Date.now()}`,
@@ -1339,8 +1441,13 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         type: 'system',
         read: false,
       };
-      setNotifications((prev) => [heldNotif, ...prev]);
+      updatedNotifs = [heldNotif, ...updatedNotifs];
     }
+
+    setTransactions(updatedTransactions);
+    setAccounts(updatedAccounts);
+    setNotifications(updatedNotifs);
+    syncImmediateToFirestore(updatedAccounts, updatedTransactions, updatedNotifs);
   };
 
   const updateTransactionTag = (txId: string, tag: string) => {

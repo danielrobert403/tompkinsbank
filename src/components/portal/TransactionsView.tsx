@@ -236,9 +236,20 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenStatem
                     {tx.amount > 0 ? `+${formatCurrency(tx.amount)}` : formatCurrency(tx.amount)}
                   </td>
                   <td className="py-3 px-4 text-center whitespace-nowrap">
-                    <span className="text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                      {tx.status}
-                    </span>
+                    {tx.status === 'pending' || tx.status === 'held' ? (
+                      <span className="inline-flex items-center gap-1.5 text-[10px] text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded font-semibold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                        {tx.status === 'held' ? 'Held by Admin' : 'Pending Authorization'}
+                      </span>
+                    ) : tx.status === 'cleared' ? (
+                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30 font-medium">
+                        Cleared
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30 font-medium">
+                        Declined / Refunded
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -304,10 +315,29 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenStatem
                 <span className="text-slate-400">Transaction ID:</span>
                 <span className="text-emerald-400">{viewingTx.id}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-slate-400">Status:</span>
-                <span className="text-emerald-300 uppercase font-semibold">{viewingTx.status}</span>
+                {viewingTx.status === 'pending' || viewingTx.status === 'held' ? (
+                  <span className="text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                    {viewingTx.status === 'held' ? 'Held by Admin' : 'Pending Authorization'}
+                  </span>
+                ) : viewingTx.status === 'cleared' ? (
+                  <span className="text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider">
+                    Cleared &amp; Released
+                  </span>
+                ) : (
+                  <span className="text-rose-300 bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider">
+                    Declined / Refunded
+                  </span>
+                )}
               </div>
+              {viewingTx.wireDetails?.clearanceCode && (
+                <div className="flex justify-between">
+                  <span className="text-slate-400">FedWire Auth:</span>
+                  <span className="text-emerald-400 font-mono text-[11px]">{viewingTx.wireDetails.clearanceCode}</span>
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex gap-3">
