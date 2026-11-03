@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useBanking } from '../context/BankingContext';
+import { useBanking, formatTransactionDate, getRealtimeDate } from '../context/BankingContext';
 import {
   CheckCircle2,
   Clock,
@@ -23,6 +23,12 @@ import {
   RefreshCw,
   ExternalLink,
   MessageSquare,
+  Trash2,
+  Calendar,
+  Edit3,
+  CheckSquare,
+  Square,
+  Trash,
 } from 'lucide-react';
 import { Transaction, TransactionStatus, PendingUserChange } from '../types/banking';
 
@@ -30,6 +36,10 @@ export const AdminDashboardPage: React.FC = () => {
   const {
     transactions,
     updateTransferStatus,
+    deleteTransaction,
+    deleteMultipleTransactions,
+    clearAllTransactions,
+    updateTransactionDate,
     accounts,
     cards,
     user,
@@ -50,9 +60,29 @@ export const AdminDashboardPage: React.FC = () => {
   const [adminReplyText, setAdminReplyText] = useState('');
   const [replySuccessMsg, setReplySuccessMsg] = useState<string | null>(null);
 
-  // Transfer queue filters
+  // Transaction History & Queue filters
+  const [transactionScope, setTransactionScope] = useState<'all' | 'pending' | 'transfers' | 'income' | 'card'>('all');
   const [filterTransferStatus, setFilterTransferStatus] = useState<'all' | 'pending' | 'held' | 'cleared' | 'rejected'>('all');
   const [transferSearch, setTransferSearch] = useState('');
+
+  // Multi-select transactions for batch operations
+  const [selectedTxIds, setSelectedTxIds] = useState<string[]>([]);
+
+  // Deletion Modal State
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    tx?: Transaction;
+    isBulk?: boolean;
+    isClearAll?: boolean;
+    revertBalance?: boolean;
+  }>({ isOpen: false, revertBalance: true });
+
+  // Date Edit Modal State
+  const [editDateModal, setEditDateModal] = useState<{
+    isOpen: boolean;
+    tx?: Transaction;
+    date: string;
+  }>({ isOpen: false, date: '' });
 
   // Changes queue filter
   const [changeStatusFilter, setChangeStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
@@ -73,31 +103,101 @@ export const AdminDashboardPage: React.FC = () => {
 
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
+  // Sorted transactions by real-time date descending
+  const sortedTransactions = [...transactions].sort((a, b) => b.date.localeCompare(a.date));
+
   // Transfers and pending transaction approval data
-  const transferTxs = transactions.filter(
+  const transferTxs = sortedTransactions.filter(
     (tx) => tx.category === 'Transfers' || tx.status === 'pending' || tx.status === 'held' || tx.wireDetails !== undefined
   );
+  const incomeTxs = sortedTransactions.filter((tx) => tx.amount > 0 || tx.category === 'Income & Salary');
+  const cardTxs = sortedTransactions.filter((tx) => tx.category !== 'Transfers' && !tx.wireDetails && tx.category !== 'Income & Salary');
 
   const pendingTransfers = transferTxs.filter((tx) => tx.status === 'pending' || tx.status === 'held');
   const pendingTransfersVolume = pendingTransfers.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
 
-  const filteredTransfers = transferTxs.filter((tx) => {
-    const matchesFilter =
-      filterTransferStatus === 'all'
-        ? true
-        : filterTransferStatus === 'pending'
-        ? tx.status === 'pending'
-        : filterTransferStatus === 'held'
-        ? tx.status === 'held'
-        : tx.status === filterTransferStatus;
+  // Filtered transactions based on scope, status filter, and search query
+  const filteredTransactions = sortedTransactions.filter((tx) => {
+    // 1. Scope filter
+    if (transactionScope === 'pending') {
+      if (tx.status !== 'pending' && tx.status !== 'held') return false;
+    } else if (transactionScope === 'transfers') {
+      if (tx.category !== 'Transfers' && !tx.wireDetails && tx.status !== 'pending') return false;
+    } else if (transactionScope === 'income') {
+      if (tx.amount <= 0 && tx.category !== 'Income & Salary') return false;
+    } else if (transactionScope === 'card') {
+      if (tx.category === 'Transfers' || tx.wireDetails || tx.category === 'Income & Salary') return false;
+    }
 
-    const matchesSearch =
-      tx.merchant.toLowerCase().includes(transferSearch.toLowerCase()) ||
-      tx.description.toLowerCase().includes(transferSearch.toLowerCase()) ||
-      tx.id.toLowerCase().includes(transferSearch.toLowerCase());
+    // 2. Status filter
+    if (filterTransferStatus !== 'all') {
+      if (filterTransferStatus === 'pending' && tx.status !== 'pending') return false;
+      if (filterTransferStatus === 'held' && tx.status !== 'held') return false;
+      if (filterTransferStatus === 'cleared' && tx.status !== 'cleared') return false;
+      if (filterTransferStatus === 'rejected' && tx.status !== 'rejected') return false;
+    }
 
-    return matchesFilter && matchesSearch;
+    // 3. Search query
+    if (transferSearch.trim()) {
+      const q = transferSearch.toLowerCase();
+      const match =
+        tx.merchant.toLowerCase().includes(q) ||
+        tx.description.toLowerCase().includes(q) ||
+        tx.id.toLowerCase().includes(q) ||
+        (tx.accountName && tx.accountName.toLowerCase().includes(q)) ||
+        tx.date.includes(q);
+      if (!match) return false;
+    }
+
+    return true;
   });
+
+  // Toggle selection for a single transaction
+  const handleToggleSelectTx = (txId: string) => {
+    setSelectedTxIds((prev) =>
+      prev.includes(txId) ? prev.filter((id) => id !== txId) : [...prev, txId]
+    );
+  };
+
+  // Select all or deselect all visible transactions
+  const handleToggleSelectAll = () => {
+    const visibleIds = filteredTransactions.map((tx) => tx.id);
+    const areAllSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedTxIds.includes(id));
+    if (areAllSelected) {
+      setSelectedTxIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+    } else {
+      setSelectedTxIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  // Confirm delete handler (single, bulk, or clear all)
+  const handleConfirmDelete = () => {
+    if (deleteModal.isClearAll) {
+      clearAllTransactions();
+      setSelectedTxIds([]);
+      setActionSuccessMsg('All customer transaction history has been cleared permanently.');
+    } else if (deleteModal.isBulk) {
+      deleteMultipleTransactions(selectedTxIds);
+      setActionSuccessMsg(`Successfully deleted ${selectedTxIds.length} transactions from customer history.`);
+      setSelectedTxIds([]);
+    } else if (deleteModal.tx) {
+      deleteTransaction(deleteModal.tx.id, deleteModal.revertBalance ?? true);
+      setSelectedTxIds((prev) => prev.filter((id) => id !== deleteModal.tx!.id));
+      setActionSuccessMsg(`Transaction #${deleteModal.tx.id.slice(-6)} deleted from customer history.`);
+    }
+    setDeleteModal({ isOpen: false });
+    setTimeout(() => setActionSuccessMsg(null), 4000);
+  };
+
+  // Confirm date edit handler
+  const handleSaveDate = () => {
+    if (editDateModal.tx && editDateModal.date) {
+      updateTransactionDate(editDateModal.tx.id, editDateModal.date);
+      setActionSuccessMsg(`Transaction #${editDateModal.tx.id.slice(-6)} date updated to ${formatTransactionDate(editDateModal.date)}.`);
+      setEditDateModal({ isOpen: false, date: '' });
+      setTimeout(() => setActionSuccessMsg(null), 4000);
+    }
+  };
 
   // Changes data
   const pendingChangesCount = pendingChanges.filter((c) => c.status === 'pending').length;
@@ -332,10 +432,13 @@ export const AdminDashboardPage: React.FC = () => {
                 }`}
               >
                 <Building2 className="w-4 h-4" />
-                <span>Transfers &amp; Wire Approvals</span>
+                <span>Transaction History &amp; Approvals</span>
+                <span className="px-1.5 py-0.5 bg-slate-900 text-white rounded-full text-[10px] font-mono font-bold">
+                  {transactions.length}
+                </span>
                 {pendingTransfers.length > 0 && (
-                  <span className="px-1.5 py-0.5 bg-amber-500 text-white rounded-full text-[10px] font-mono font-bold">
-                    {pendingTransfers.length}
+                  <span className="px-1.5 py-0.5 bg-amber-500 text-white rounded-full text-[10px] font-mono font-bold" title="Pending approvals">
+                    {pendingTransfers.length} Pending
                   </span>
                 )}
               </button>
@@ -388,100 +491,237 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* TAB 1: TRANSFERS APPROVAL QUEUE */}
+          {/* TAB 1: TRANSACTION HISTORY & APPROVALS MANAGEMENT */}
           {activeTab === 'transfers' && (
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-5">
               
-              {/* Filter and Search Bar */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+              {/* Real-time Date & Operations Header Info */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50 border border-slate-200 p-3.5 rounded-lg text-xs">
+                <div className="flex items-center gap-2.5">
+                  <Calendar className="w-4 h-4 text-[#004732] shrink-0" />
+                  <span className="text-slate-700">
+                    <strong>Real-Time Calendar Date:</strong> {formatTransactionDate(getRealtimeDate(), { showDayOfWeek: true })}
+                  </span>
+                  <span className="text-slate-400 font-mono text-[11px]">({getRealtimeDate()})</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-500 text-[11px]">
+                  <span>Total Records: <strong className="text-slate-800">{transactions.length}</strong></span>
+                  <span>·</span>
+                  <span>Pending Volume: <strong className="text-amber-700">{formatCurrency(pendingTransfersVolume)}</strong></span>
+                </div>
+              </div>
+
+              {/* Scope & Status Filter Bar */}
+              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                
+                {/* Scope Tabs */}
+                <div className="flex items-center gap-1.5 overflow-x-auto w-full lg:w-auto pb-1 lg:pb-0">
                   <button
-                    onClick={() => setFilterTransferStatus('all')}
-                    className={`px-3 py-1.5 rounded text-xs font-semibold border transition-colors cursor-pointer ${
-                      filterTransferStatus === 'all'
+                    onClick={() => setTransactionScope('all')}
+                    className={`px-3 py-1.5 rounded text-xs font-semibold border transition-colors cursor-pointer whitespace-nowrap ${
+                      transactionScope === 'all'
                         ? 'bg-[#004732] text-white border-[#004732]'
                         : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                     }`}
                   >
-                    All Transfers ({transferTxs.length})
+                    All Transactions ({transactions.length})
                   </button>
                   <button
-                    onClick={() => setFilterTransferStatus('pending')}
-                    className={`px-3 py-1.5 rounded text-xs font-semibold border transition-colors flex items-center gap-1.5 cursor-pointer ${
-                      filterTransferStatus === 'pending'
+                    onClick={() => setTransactionScope('pending')}
+                    className={`px-3 py-1.5 rounded text-xs font-semibold border transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                      transactionScope === 'pending'
                         ? 'bg-amber-500 text-white border-amber-500'
                         : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-50'
                     }`}
                   >
                     <Clock className="w-3.5 h-3.5" />
-                    <span>Pending Approval ({pendingTransfers.length})</span>
+                    <span>Pending Queue ({pendingTransfers.length})</span>
                   </button>
                   <button
-                    onClick={() => setFilterTransferStatus('cleared')}
-                    className={`px-3 py-1.5 rounded text-xs font-semibold border transition-colors cursor-pointer ${
-                      filterTransferStatus === 'cleared'
-                        ? 'bg-emerald-600 text-white border-emerald-600'
+                    onClick={() => setTransactionScope('transfers')}
+                    className={`px-3 py-1.5 rounded text-xs font-semibold border transition-colors cursor-pointer whitespace-nowrap ${
+                      transactionScope === 'transfers'
+                        ? 'bg-[#004732] text-white border-[#004732]'
                         : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                     }`}
                   >
-                    Cleared &amp; Released
+                    Transfers &amp; Wires ({transferTxs.length})
                   </button>
                   <button
-                    onClick={() => setFilterTransferStatus('rejected')}
-                    className={`px-3 py-1.5 rounded text-xs font-semibold border transition-colors cursor-pointer ${
-                      filterTransferStatus === 'rejected'
-                        ? 'bg-rose-600 text-white border-rose-600'
+                    onClick={() => setTransactionScope('income')}
+                    className={`px-3 py-1.5 rounded text-xs font-semibold border transition-colors cursor-pointer whitespace-nowrap ${
+                      transactionScope === 'income'
+                        ? 'bg-emerald-700 text-white border-emerald-700'
+                        : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
+                    }`}
+                  >
+                    Deposits &amp; Earnings ({incomeTxs.length})
+                  </button>
+                  <button
+                    onClick={() => setTransactionScope('card')}
+                    className={`px-3 py-1.5 rounded text-xs font-semibold border transition-colors cursor-pointer whitespace-nowrap ${
+                      transactionScope === 'card'
+                        ? 'bg-slate-800 text-white border-slate-800'
                         : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                     }`}
                   >
-                    Rejected &amp; Refunded
+                    Card &amp; POS ({cardTxs.length})
                   </button>
                 </div>
 
-                <div className="relative w-full sm:w-72">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="Search beneficiary, ID, or memo..."
-                    value={transferSearch}
-                    onChange={(e) => setTransferSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-1.5 rounded border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#004732]"
-                  />
+                {/* Status Selector & Search */}
+                <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+                  <select
+                    value={filterTransferStatus}
+                    onChange={(e) => setFilterTransferStatus(e.target.value as any)}
+                    className="px-2.5 py-1.5 rounded border border-slate-300 text-xs text-slate-700 bg-white focus:outline-none focus:border-[#004732]"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="pending">Pending Approval</option>
+                    <option value="held">Held by Admin</option>
+                    <option value="cleared">Cleared &amp; Released</option>
+                    <option value="rejected">Rejected &amp; Refunded</option>
+                  </select>
+
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search payee, ID, date, amount..."
+                      value={transferSearch}
+                      onChange={(e) => setTransferSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 rounded border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#004732]"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Table of Transfers */}
-              <div className="border border-slate-200 rounded-lg overflow-hidden">
+              {/* Batch Actions & History Purge Toolbar */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-100/70 p-3 rounded-lg border border-slate-200">
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={handleToggleSelectAll}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 cursor-pointer"
+                  >
+                    {filteredTransactions.length > 0 && filteredTransactions.every((tx) => selectedTxIds.includes(tx.id)) ? (
+                      <CheckSquare className="w-4 h-4 text-[#004732]" />
+                    ) : (
+                      <Square className="w-4 h-4 text-slate-400" />
+                    )}
+                    <span>Select All Visible ({filteredTransactions.length})</span>
+                  </button>
+
+                  {selectedTxIds.length > 0 && (
+                    <div className="flex items-center gap-2 pl-3 border-l border-slate-300">
+                      <span className="px-2 py-0.5 bg-[#004732] text-white text-[11px] font-bold rounded-full">
+                        {selectedTxIds.length} Selected
+                      </span>
+                      <button
+                        onClick={() => setDeleteModal({ isOpen: true, isBulk: true, revertBalance: true })}
+                        className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Selected ({selectedTxIds.length})</span>
+                      </button>
+                      <button
+                        onClick={() => setSelectedTxIds([])}
+                        className="text-xs text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                      >
+                        Deselect
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setDeleteModal({ isOpen: true, isClearAll: true })}
+                    className="px-3 py-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 rounded text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+                    title="Delete entire transaction history from customer account"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Clear All History</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Table of Transactions */}
+              <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs font-mono">
                     <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 text-[11px]">
                       <tr>
-                        <th className="py-3 px-4">Ref &amp; Date</th>
-                        <th className="py-3 px-4">Beneficiary &amp; Institution</th>
-                        <th className="py-3 px-4">Origin Account</th>
+                        <th className="py-3 px-3 w-8 text-center">
+                          <span className="sr-only">Select</span>
+                        </th>
+                        <th className="py-3 px-4">Ref &amp; Real-Time Date</th>
+                        <th className="py-3 px-4">Beneficiary / Merchant</th>
+                        <th className="py-3 px-4">Account</th>
                         <th className="py-3 px-4 text-right">Amount</th>
                         <th className="py-3 px-4 text-center">Status</th>
-                        <th className="py-3 px-4 text-center">Dual Approval Controls</th>
+                        <th className="py-3 px-4 text-center">Administrative Controls</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {filteredTransfers.map((tx) => {
+                      {filteredTransactions.map((tx) => {
                         const isPending = tx.status === 'pending' || tx.status === 'held';
                         const isCleared = tx.status === 'cleared';
                         const isRejected = tx.status === 'rejected';
+                        const isCredit = tx.amount > 0;
+                        const isSelected = selectedTxIds.includes(tx.id);
 
                         return (
-                          <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors">
-                            {/* Ref & Date */}
-                            <td className="py-3.5 px-4 whitespace-nowrap">
-                              <p className="font-bold text-slate-900">#{tx.id.slice(-8)}</p>
-                              <p className="text-[11px] text-slate-500 font-sans">{tx.date}</p>
+                          <tr
+                            key={tx.id}
+                            className={`transition-colors ${
+                              isSelected ? 'bg-emerald-50/50 hover:bg-emerald-50/80' : 'hover:bg-slate-50/70'
+                            }`}
+                          >
+                            {/* Checkbox */}
+                            <td className="py-3.5 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSelectTx(tx.id)}
+                                className="cursor-pointer inline-flex items-center justify-center"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="w-4 h-4 text-[#004732]" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-slate-300 hover:text-slate-500" />
+                                )}
+                              </button>
                             </td>
 
-                            {/* Beneficiary */}
+                            {/* Ref & Date with Real-Time formatting and edit trigger */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <p className="font-bold text-slate-900">#{tx.id.slice(-8)}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="text-[11px] text-slate-700 font-sans font-medium">
+                                  {formatTransactionDate(tx.date)}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono">({tx.date})</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditDateModal({ isOpen: true, tx, date: tx.date })}
+                                  className="text-slate-400 hover:text-[#004732] p-0.5 rounded cursor-pointer"
+                                  title="Change date or align with real-time date"
+                                >
+                                  <Edit3 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* Beneficiary & Category Details */}
                             <td className="py-3.5 px-4">
-                              <p className="font-semibold text-slate-900 font-sans text-xs">{tx.merchant}</p>
-                              <p className="text-[11px] text-slate-500 font-sans">{tx.description}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-slate-900 font-sans text-xs">{tx.merchant}</p>
+                                {tx.category && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                    {tx.category}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 font-sans mt-0.5">{tx.description}</p>
                               {tx.wireDetails?.adminHoldReason && (
                                 <p className="text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded inline-block mt-1 font-sans border border-amber-200">
                                   Hold Reason: {tx.wireDetails.adminHoldReason}
@@ -496,12 +736,14 @@ export const AdminDashboardPage: React.FC = () => {
 
                             {/* Origin Account */}
                             <td className="py-3.5 px-4 whitespace-nowrap text-slate-600 font-sans">
-                              {tx.accountName}
+                              {tx.accountName || 'Checking (*4491)'}
                             </td>
 
                             {/* Amount */}
-                            <td className="py-3.5 px-4 text-right font-bold text-sm tabular-nums whitespace-nowrap text-slate-900">
-                              {formatCurrency(Math.abs(tx.amount))}
+                            <td className="py-3.5 px-4 text-right font-bold text-sm tabular-nums whitespace-nowrap">
+                              <span className={isCredit ? 'text-emerald-700' : 'text-slate-900'}>
+                                {isCredit ? '+' : ''}{formatCurrency(tx.amount)}
+                              </span>
                             </td>
 
                             {/* Status */}
@@ -523,9 +765,9 @@ export const AdminDashboardPage: React.FC = () => {
                               )}
                             </td>
 
-                            {/* Actions */}
+                            {/* Actions: Approvals, Edit Date & Delete */}
                             <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                              <div className="flex items-center justify-center gap-2 font-sans">
+                              <div className="flex items-center justify-center gap-1.5 font-sans">
                                 {isPending && (
                                   <>
                                     <button
@@ -534,19 +776,19 @@ export const AdminDashboardPage: React.FC = () => {
                                         setActionSuccessMsg(`Transfer #${tx.id.slice(-6)} APPROVED & RELEASED. Federal Reserve settlement transmitted in real time.`);
                                         setTimeout(() => setActionSuccessMsg(null), 4000);
                                       }}
-                                      className="px-3 py-1.5 bg-[#004732] hover:bg-[#003828] text-white rounded text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
+                                      className="px-2.5 py-1.5 bg-[#004732] hover:bg-[#003828] text-white rounded text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
                                       title="1-Click Approve and Clear Transfer"
                                     >
                                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
-                                      <span>Approve Transfer</span>
+                                      <span>Approve</span>
                                     </button>
 
                                     <button
                                       onClick={() => setTransferActionModal({ type: 'reject', tx })}
-                                      className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded text-xs font-semibold transition-colors cursor-pointer"
+                                      className="px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded text-xs font-semibold transition-colors cursor-pointer"
                                       title="Decline transfer and refund customer"
                                     >
-                                      Reject &amp; Refund
+                                      Reject
                                     </button>
 
                                     {tx.status !== 'held' && (
@@ -561,28 +803,36 @@ export const AdminDashboardPage: React.FC = () => {
                                   </>
                                 )}
 
-                                {isCleared && (
-                                  <span className="text-[11px] font-mono font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200 flex items-center gap-1">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                    <span>Settled ({tx.wireDetails?.clearanceCode || 'AUTH-OK'})</span>
-                                  </span>
-                                )}
+                                {/* Edit Date Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => setEditDateModal({ isOpen: true, tx, date: tx.date })}
+                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition-colors cursor-pointer"
+                                  title="Align or edit transaction date"
+                                >
+                                  <Calendar className="w-3.5 h-3.5" />
+                                </button>
 
-                                {isRejected && (
-                                  <span className="text-[11px] font-mono font-semibold text-rose-700 bg-rose-50 px-2.5 py-1 rounded border border-rose-200">
-                                    Declined &amp; Refunded
-                                  </span>
-                                )}
+                                {/* Delete Transaction Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteModal({ isOpen: true, tx, revertBalance: true })}
+                                  className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded transition-colors cursor-pointer"
+                                  title="Delete transaction from history"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             </td>
                           </tr>
                         );
                       })}
 
-                      {filteredTransfers.length === 0 && (
+                      {filteredTransactions.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="py-12 text-center text-slate-500 font-sans">
-                            No transfers match your current filter criteria.
+                          <td colSpan={7} className="py-12 text-center text-slate-500 font-sans">
+                            <p className="font-semibold text-slate-700">No transactions match your current filters.</p>
+                            <p className="text-xs text-slate-400 mt-1">Try switching tabs or resetting the search term.</p>
                           </td>
                         </tr>
                       )}
@@ -1116,6 +1366,229 @@ export const AdminDashboardPage: React.FC = () => {
                 }`}
               >
                 {changeActionModal.type === 'approve' ? 'Confirm & Apply Change' : 'Confirm Decline'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          DELETE TRANSACTION MODAL (Single, Bulk, or Clear All)
+          ========================================================================= */}
+      {deleteModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white rounded-lg shadow-xl border border-slate-200 p-6 space-y-4">
+            
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-rose-50 rounded-full text-rose-600">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  {deleteModal.isClearAll
+                    ? 'Clear All Transaction History'
+                    : deleteModal.isBulk
+                    ? `Delete ${selectedTxIds.length} Transactions`
+                    : 'Delete Transaction from History'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {deleteModal.isClearAll
+                    ? 'Purge customer transaction records across devices'
+                    : 'Remove transaction record from customer ledger'}
+                </p>
+              </div>
+            </div>
+
+            {/* Single Transaction Details */}
+            {deleteModal.tx && !deleteModal.isBulk && !deleteModal.isClearAll && (
+              <div className="p-3 bg-slate-50 rounded border border-slate-200 text-xs font-mono space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-sans">Reference:</span>
+                  <span className="font-bold text-slate-900">#{deleteModal.tx.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-sans">Payee / Merchant:</span>
+                  <span className="font-bold text-slate-900 font-sans">{deleteModal.tx.merchant}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-sans">Date:</span>
+                  <span className="text-slate-800 font-sans">
+                    {formatTransactionDate(deleteModal.tx.date)} ({deleteModal.tx.date})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-sans">Amount:</span>
+                  <span className={`font-bold text-sm ${deleteModal.tx.amount > 0 ? 'text-emerald-700' : 'text-slate-900'}`}>
+                    {deleteModal.tx.amount > 0 ? '+' : ''}{formatCurrency(deleteModal.tx.amount)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Single Tx Option to Revert Balance */}
+            {deleteModal.tx && !deleteModal.isBulk && !deleteModal.isClearAll && (
+              <label className="flex items-start gap-2.5 p-3 bg-amber-50/60 border border-amber-200/70 rounded-md text-xs cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteModal.revertBalance ?? true}
+                  onChange={(e) =>
+                    setDeleteModal((prev) => ({ ...prev, revertBalance: e.target.checked }))
+                  }
+                  className="mt-0.5 rounded text-[#004732] focus:ring-[#004732]"
+                />
+                <div className="space-y-0.5">
+                  <span className="font-semibold text-slate-800 block">
+                    Restore / Revert Account Balance
+                  </span>
+                  <span className="text-slate-500 block text-[11px] leading-relaxed">
+                    If checked, funds will be automatically credited back for debits/wires, or deducted for incoming deposits.
+                  </span>
+                </div>
+              </label>
+            )}
+
+            {/* Bulk Deletion Summary */}
+            {deleteModal.isBulk && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded text-xs text-rose-800 space-y-1">
+                <p className="font-semibold">
+                  You are about to delete {selectedTxIds.length} selected transaction records.
+                </p>
+                <p className="text-[11px] text-rose-700">
+                  This will remove them permanently from the customer&apos;s transaction history.
+                </p>
+              </div>
+            )}
+
+            {/* Clear All Confirmation */}
+            {deleteModal.isClearAll && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded text-xs text-rose-800 space-y-1.5">
+                <p className="font-bold flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                  <span>Permanent History Purge</span>
+                </p>
+                <p className="text-[11px] leading-relaxed">
+                  Are you sure you want to clear <strong>all {transactions.length} transactions</strong>? This resets the customer&apos;s transaction history completely across all devices in real time.
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteModal({ isOpen: false })}
+                className="flex-1 py-2 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="flex-1 py-2 rounded bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>
+                  {deleteModal.isClearAll
+                    ? 'Confirm Purge History'
+                    : deleteModal.isBulk
+                    ? `Delete (${selectedTxIds.length})`
+                    : 'Confirm Delete'}
+                </span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          EDIT TRANSACTION DATE MODAL (Align to Real Time or Custom Date)
+          ========================================================================= */}
+      {editDateModal.isOpen && editDateModal.tx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white rounded-lg shadow-xl border border-slate-200 p-6 space-y-4">
+            
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-emerald-50 rounded-full text-[#004732]">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  Align or Edit Transaction Date
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Sync transaction date with real-time calendar date
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded border border-slate-200 text-xs font-mono space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-sans">Reference:</span>
+                <span className="font-bold text-slate-900">#{editDateModal.tx.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-sans">Payee / Merchant:</span>
+                <span className="font-bold text-slate-900 font-sans">{editDateModal.tx.merchant}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-sans">Current Date:</span>
+                <span className="text-slate-800 font-sans">
+                  {formatTransactionDate(editDateModal.tx.date)} ({editDateModal.tx.date})
+                </span>
+              </div>
+            </div>
+
+            {/* Quick action to align with Real-Time Date (Today) */}
+            <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-md text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-emerald-950">Quick Real-Time Sync:</span>
+                <span className="font-mono text-emerald-800 text-[11px] font-bold">{getRealtimeDate()}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditDateModal((prev) => ({ ...prev, date: getRealtimeDate() }))}
+                className="w-full py-1.5 px-3 bg-[#004732] hover:bg-[#003828] text-white rounded text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Set to Today&apos;s Real-Time Date ({formatTransactionDate(getRealtimeDate())})</span>
+              </button>
+            </div>
+
+            {/* Custom Date Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 block">
+                Custom Transaction Date:
+              </label>
+              <input
+                type="date"
+                value={editDateModal.date}
+                onChange={(e) => setEditDateModal((prev) => ({ ...prev, date: e.target.value }))}
+                className="w-full p-2.5 border border-slate-300 rounded text-xs text-slate-900 focus:outline-none focus:border-[#004732]"
+              />
+              {editDateModal.date && (
+                <p className="text-[11px] text-slate-500">
+                  Will display as: <strong>{formatTransactionDate(editDateModal.date, { showDayOfWeek: true })}</strong>
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditDateModal({ isOpen: false, date: '' })}
+                className="flex-1 py-2 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveDate}
+                disabled={!editDateModal.date}
+                className="flex-1 py-2 rounded bg-[#004732] hover:bg-[#003828] disabled:opacity-50 text-white text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Save &amp; Sync Date</span>
               </button>
             </div>
 

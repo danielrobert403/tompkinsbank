@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useBanking } from '../context/BankingContext';
+import { useBanking, formatTransactionDate } from '../context/BankingContext';
 import { QuickTransferModal } from '../components/portal/QuickTransferModal';
 import { TompkinsLogo } from '../components/TompkinsLogo';
 import { Transaction } from '../types/banking';
@@ -114,18 +114,18 @@ export const MyAccountPage: React.FC<MyAccountPageProps> = ({ onOpenStatement, o
     return matchesMerchant || matchesAmount || matchesDate || matchesTag || matchesNotes;
   });
 
+  // Sort transactions by date descending so realtime recent transactions always align at the top
+  const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+    const dDiff = b.date.localeCompare(a.date);
+    if (dDiff !== 0) return dDiff;
+    return b.id.localeCompare(a.id);
+  });
+
   // Group transactions by date label matching screenshots
   const groupTransactionsByDate = (txs: Transaction[]) => {
     const groups: { [key: string]: Transaction[] } = {};
     txs.forEach((tx) => {
-      let label = tx.date;
-      try {
-        const d = new Date(tx.date + 'T00:00:00');
-        label = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-      } catch {
-        label = tx.date;
-      }
-
+      const label = formatTransactionDate(tx.date, { showDayOfWeek: true });
       if (!groups[label]) {
         groups[label] = [];
       }
@@ -134,7 +134,7 @@ export const MyAccountPage: React.FC<MyAccountPageProps> = ({ onOpenStatement, o
     return groups;
   };
 
-  const groupedTx = groupTransactionsByDate(filteredTransactions);
+  const groupedTx = groupTransactionsByDate(sortedTransactions);
 
   const handleSaveTag = (txId: string) => {
     if (tagInput.trim()) {
@@ -508,14 +508,7 @@ export const MyAccountPage: React.FC<MyAccountPageProps> = ({ onOpenStatement, o
                                     </div>
                                   ) : (
                                     <p className="text-xs text-slate-500">
-                                      {(() => {
-                                        try {
-                                          const d = new Date(tx.date + 'T00:00:00');
-                                          return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, Checking`;
-                                        } catch {
-                                          return 'Jul 20, Checking';
-                                        }
-                                      })()}
+                                      {formatTransactionDate(tx.date)}, {tx.accountName || 'Checking'}
                                     </p>
                                   )}
                                 </div>

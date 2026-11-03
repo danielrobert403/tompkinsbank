@@ -25,6 +25,40 @@ import {
   INITIAL_SUPPORT_MESSAGES,
 } from '../data/initialData';
 
+export const getRealtimeDate = (): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const formatTransactionDate = (dateStr: string, options?: { showDayOfWeek?: boolean }): string => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const d = new Date(year, month, day);
+    if (!isNaN(d.getTime())) {
+      const today = new Date();
+      const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const isYesterday = yesterday.getFullYear() === year && yesterday.getMonth() === month && yesterday.getDate() === day;
+
+      if (options?.showDayOfWeek) {
+        if (isToday) return `Today — ${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`;
+        if (isYesterday) return `Yesterday — ${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`;
+        return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+      }
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  }
+  return dateStr;
+};
+
 export interface UserProfile {
   name: string;
   email: string;
@@ -96,6 +130,10 @@ interface BankingContextType {
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   updateTransferStatus: (txId: string, newStatus: TransactionStatus, reason?: string) => void;
+  deleteTransaction: (txId: string, revertBalance?: boolean) => void;
+  deleteMultipleTransactions: (txIds: string[]) => void;
+  clearAllTransactions: () => void;
+  updateTransactionDate: (txId: string, newDate: string) => void;
   updateTransactionTag: (txId: string, tag: string) => void;
   updateTransactionNotes: (txId: string, notes: string) => void;
   updateTransactionImage: (txId: string, imageUrl: string) => void;
@@ -748,7 +786,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return { success: false, message: 'Invalid 4-digit Security PIN. Authorization denied.' };
     }
 
-    const txDate = '2026-10-31';
+    const txDate = getRealtimeDate();
     const txId = `tx_${Date.now()}`;
 
     // Handle Internal Transfer - Debits source immediately to reserve funds, queues as pending admin approval
@@ -952,7 +990,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return { success: false, message: 'Check amount exceeds daily remote deposit limit ($50,000.00).' };
     }
 
-    const txDate = new Date().toISOString().split('T')[0];
+    const txDate = getRealtimeDate();
     const txId = `chk_${Date.now()}`;
 
     // Update account balance
@@ -1022,7 +1060,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return { success: false, message: 'Payment amount must be greater than $0.00' };
     }
 
-    const txDate = new Date().toISOString().split('T')[0];
+    const txDate = getRealtimeDate();
     const txId = `bill_${Date.now()}`;
 
     setAccounts((prev) =>
@@ -1253,7 +1291,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       })
     );
 
-    const txDate = new Date().toISOString().split('T')[0];
+    const txDate = getRealtimeDate();
     const txId = `goal_${Date.now()}`;
 
     const goalTx: Transaction = {
@@ -1299,7 +1337,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         id: `tx_init_${Date.now()}`,
         accountId: newAccount.id,
         accountName: newAccount.name,
-        date: new Date().toISOString().split('T')[0],
+        date: getRealtimeDate(),
         merchant: 'Apex Initial Opening Deposit',
         description: 'New Account Opening Funding',
         amount: initialDeposit,
@@ -1411,7 +1449,7 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
             id: `${targetTx.id}_cred`,
             accountId: destAcc.id,
             accountName: destAcc.name,
-            date: '2026-09-17',
+            date: targetTx.date || getRealtimeDate(),
             merchant: `Transfer from ${targetTx.accountName}`,
             description: `Approved Internal Transfer from ${targetTx.accountName}`,
             amount: transferAmt,
@@ -1466,6 +1504,45 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setTransactions((prev) =>
       prev.map((tx) => (tx.id === txId ? { ...tx, attachedImageUrl: imageUrl } : tx))
     );
+  };
+
+  const deleteTransaction = (txId: string, revertBalance = false) => {
+    const targetTx = transactions.find((t) => t.id === txId);
+    let updatedAccounts = accounts;
+    if (revertBalance && targetTx) {
+      updatedAccounts = accounts.map((a) => {
+        if (a.id === targetTx.accountId) {
+          // If transaction was debit (-$100), reverting adds $100 back. If credit (+$100), reverting subtracts $100.
+          const newBal = a.balance - targetTx.amount;
+          return { ...a, balance: newBal, availableBalance: newBal };
+        }
+        return a;
+      });
+      setAccounts(updatedAccounts);
+    }
+    const updatedTransactions = transactions.filter((tx) => tx.id !== txId);
+    setTransactions(updatedTransactions);
+    syncImmediateToFirestore(updatedAccounts, updatedTransactions, notifications);
+  };
+
+  const deleteMultipleTransactions = (txIds: string[]) => {
+    const idSet = new Set(txIds);
+    const updatedTransactions = transactions.filter((tx) => !idSet.has(tx.id));
+    setTransactions(updatedTransactions);
+    syncImmediateToFirestore(accounts, updatedTransactions, notifications);
+  };
+
+  const clearAllTransactions = () => {
+    setTransactions([]);
+    syncImmediateToFirestore(accounts, [], notifications);
+  };
+
+  const updateTransactionDate = (txId: string, newDate: string) => {
+    const updatedTransactions = transactions.map((tx) =>
+      tx.id === txId ? { ...tx, date: newDate } : tx
+    );
+    setTransactions(updatedTransactions);
+    syncImmediateToFirestore(accounts, updatedTransactions, notifications);
   };
 
   const resetAllData = () => {
@@ -1542,6 +1619,10 @@ export const BankingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         markNotificationRead,
         markAllNotificationsRead,
         updateTransferStatus,
+        deleteTransaction,
+        deleteMultipleTransactions,
+        clearAllTransactions,
+        updateTransactionDate,
         updateTransactionTag,
         updateTransactionNotes,
         updateTransactionImage,
